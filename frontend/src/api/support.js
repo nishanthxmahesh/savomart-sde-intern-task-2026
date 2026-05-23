@@ -10,6 +10,11 @@ export async function createTicket(payload) {
   return data;
 }
 
+export async function sendChatMessage(messages) {
+  const { data } = await api.post('/api/support/chat', { messages });
+  return data;
+}
+
 export async function fetchMyTickets() {
   const { data } = await api.get('/api/support/my-tickets');
   return data;

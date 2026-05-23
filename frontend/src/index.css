@@ -72,6 +72,15 @@
   100% { transform: scale(1.6); opacity: 0; }
 }
 
+/* ---------- Chat typing indicator ---------- */
+.savo-typing-dot {
+  animation: typingBob 0.9s infinite ease-in-out;
+}
+@keyframes typingBob {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
 /* ---------- Ticket success checkmark ---------- */
 .savo-check-burst {
   animation: checkBurst 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;

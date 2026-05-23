@@ -14,9 +14,9 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
-    ai_provider: str = "anthropic"
-    ai_api_key: str = ""
-    ai_model: str = "claude-sonnet-4-5"
+    ai_provider: str = "groq"
+    ai_model: str = "llama-3.3-70b-versatile"
+    groq_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 

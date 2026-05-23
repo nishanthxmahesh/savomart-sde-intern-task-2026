@@ -6,6 +6,8 @@ import { apiErrorMessage } from '../api/client';
 import { createTicket, fetchMyTickets, fetchSupportInfo } from '../api/support';
 import AppHeader from '../components/AppHeader';
 import BottomNav from '../components/BottomNav';
+import ChatDrawer from '../components/ChatDrawer';
+import ChatFab from '../components/ChatFab';
 import TicketStatusBadge from '../components/TicketStatusBadge';
 import TicketSuccess from '../components/TicketSuccess';
 import { SkeletonBlock } from '../components/Skeleton';
@@ -265,6 +267,7 @@ function MyTicketsList({ tickets, loading, onSwitchToNew }) {
 export default function Support() {
   const [tab, setTab] = useState('new'); // 'new' | 'mine'
   const [success, setSuccess] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const infoQ = useAsync(fetchSupportInfo);
   const ticketsQ = useAsync(fetchMyTickets, [tab]);
 
@@ -342,6 +345,15 @@ export default function Support() {
       </main>
 
       <BottomNav />
+
+      <ChatFab onClick={() => setChatOpen((o) => !o)} open={chatOpen} />
+      <ChatDrawer
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        onTicketCreated={() => {
+          if (tab === 'mine') ticketsQ.reload();
+        }}
+      />
     </div>
   );
 }

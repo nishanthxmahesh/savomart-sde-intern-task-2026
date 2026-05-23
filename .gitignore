@@ -16,8 +16,9 @@ backend/env/
 *.sqlite
 *.sqlite3
 
-# Excel exports
+# Excel exports (local artifacts — directory is checked in via .gitkeep)
 backend/exports/*.xlsx
+!backend/exports/.gitkeep
 
 # Node
 node_modules/

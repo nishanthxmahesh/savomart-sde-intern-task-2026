@@ -178,6 +178,8 @@ class CreateTicketRequest(BaseModel):
     category: str = Field(..., min_length=1)
     subject: str = Field(..., min_length=3, max_length=200)
     description: str = Field(..., min_length=20, max_length=4000)
+    source: Optional[str] = Field(default="form", pattern="^(form|chat)$")
+    chat_transcript: Optional[str] = Field(default=None, max_length=20000)
 
     @field_validator("category")
     @classmethod
@@ -191,6 +193,21 @@ class CreateTicketRequest(BaseModel):
     @classmethod
     def trim(cls, v: str) -> str:
         return v.strip()
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(..., min_length=1, max_length=40)
+
+
+class ChatResponse(BaseModel):
+    role: str = "assistant"
+    content: str
+    model: str
 
 
 class TicketResponse(BaseModel):

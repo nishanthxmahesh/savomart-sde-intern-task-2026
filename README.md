@@ -2,7 +2,7 @@
 
 A customer-facing loyalty companion for Savomart shoppers — points, offers, store discovery, and support in one place. Built as the SDE Intern take-home challenge.
 
-> **Status:** All 6 core phases shipped — auth, dashboard, offers, stores+map, support, polished navigation. AI chat-agent bonus + deployment land next.
+> **Status:** Complete + AI chat-agent bonus shipped. Deployment is the only remaining piece.
 
 ## Quick start
 
@@ -68,7 +68,8 @@ savomart-sde-intern-task-2026/
 │       ├── profile.py        /api/profile/me · /coupons · /transactions
 │       ├── offers.py         /api/offers (scope · category · expiring · search · eligibility)
 │       ├── stores.py         /api/stores (live-API proxy + 5-min cache + fallback)
-│       └── support.py        /api/support/info · /ticket · /my-tickets
+│       └── support.py        /api/support/info · /ticket · /my-tickets · /chat (Groq · Llama 3.3 70B)
+├── backend/excel_export.py   openpyxl append helper for support_tickets.xlsx
 ├── frontend/                 React 19 + Vite + Tailwind v3
 │   └── src/
 │       ├── api/              axios client + auth/profile API
@@ -191,6 +192,31 @@ savomart-sde-intern-task-2026/
   - **375px (phone)** — single column everywhere, BottomNav at the bottom, Stores page has a Map/List view toggle (side-by-side doesn't fit)
   - **768px (tablet)** — Stores page reveals the sidebar alongside the map (per spec); Offers list goes two-column
   - **1024px+ (laptop)** — desktop nav appears in the header, BottomNav disappears, Dashboard becomes 2/3 + 1/3 grid (main column + sidebar)
+
+## Bonus — AI chat agent ("Savo") + Excel export
+
+A second way to raise a ticket: chat with **Savo**, our AI support agent, who collects the four required fields conversationally and creates the ticket automatically.
+
+### How it works
+- **Floating chat button** (bottom-right) on the Support page opens a slide-up drawer on mobile / right-side panel on desktop (md+). Branded purple FAB with a small yellow pulse dot.
+- **`POST /api/support/chat`** (JWT-protected) takes a `messages: [{role, content}]` history and forwards it to **Groq's Llama-3.3-70B-versatile** with our Savo system prompt. The server prepends a *Customer context* block (name, mobile, tier, points balance) so Savo can greet by name and avoid re-asking what we already know.
+- When Savo has gathered all four pieces (name · contact · category · description), it ends its reply with a `<ticket_ready>{…}</ticket_ready>` block.
+- The frontend strips that block from the rendered bubble, parses the JSON (with a code-fence fallback in case the model wraps it), validates the category against the canonical list, and posts to `/api/support/ticket` with `source="chat"` plus the full conversation transcript.
+- The freshly-created ticket appears as a green success card inside the chat, with the `SAVO-XXXX` id.
+
+### Excel export (openpyxl)
+Every created ticket — form OR chat — appends a row to `backend/exports/support_tickets.xlsx`. Columns: Ticket ID · Timestamp (UTC) · User ID · Mobile · Name · Category · Subject · Description · Source · Status. Header row is brand-styled (purple fill, yellow bold text) with frozen panes and sensible column widths. File is created on first ticket. Writes are thread-locked (single-process dev/demo); for multi-worker production we'd queue these. Failures are logged but never break the API response.
+
+### To enable Savo locally
+1. Get a free key at [console.groq.com](https://console.groq.com)
+2. Add to `backend/.env`: `GROQ_API_KEY=gsk_…`
+3. Restart the backend
+4. Open the Support page, tap the floating chat bubble, say "hi"
+
+Without a key, `/api/support/chat` returns a 503 with a clear message; the floating button still works but the form path is unaffected.
+
+### Why Groq (vs Anthropic / OpenAI)
+Groq's inference is fast enough that the conversation feels responsive — Llama-3.3-70B at ~250 tokens/sec keeps round-trips under a second on typical turns. They also offer a generous free tier for evaluators to actually try the demo without paying. The system prompt is provider-agnostic, so swapping to Claude or GPT-4o is a 10-line edit in `routers/support.py`.
 
 ## Data model (current)
 
