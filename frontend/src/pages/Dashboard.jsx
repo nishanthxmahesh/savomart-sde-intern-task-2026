@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAsync } from '../hooks/useAsync';
 import { fetchCoupons, fetchProfile, fetchTransactions } from '../api/profile';
 import AppHeader from '../components/AppHeader';
+import BottomNav from '../components/BottomNav';
 import PointsCard from '../components/PointsCard';
 import TierBadge from '../components/TierBadge';
 import CouponCard from '../components/CouponCard';
@@ -196,6 +197,8 @@ export default function Dashboard() {
           </aside>
         </div>
       </main>
+
+      <BottomNav />
     </div>
   );
 }

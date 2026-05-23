@@ -2,7 +2,7 @@
 
 A customer-facing loyalty companion for Savomart shoppers — points, offers, store discovery, and support in one place. Built as the SDE Intern take-home challenge.
 
-> **Status:** Phase 2 of 6 — loyalty profile dashboard (animated points, tier progress, coupons, recent activity). Working end-to-end locally. More phases land in subsequent commits.
+> **Status:** Phase 3 of 6 — offers browser with category filters, search, expiring-soon surfacing, and tier-locked offers. Bottom navigation now wired across pages. Working end-to-end locally. More phases land in subsequent commits.
 
 ## Quick start
 
@@ -65,7 +65,8 @@ savomart-sde-intern-task-2026/
 │   ├── seed.py               idempotent demo seed
 │   └── routers/
 │       ├── auth.py           /api/auth/send-otp · /verify-otp
-│       └── profile.py        /api/profile/me · /coupons · /transactions
+│       ├── profile.py        /api/profile/me · /coupons · /transactions
+│       └── offers.py         /api/offers (scope · category · expiring · search · eligibility)
 ├── frontend/                 React 19 + Vite + Tailwind v3
 │   └── src/
 │       ├── api/              axios client + auth/profile API
@@ -73,7 +74,7 @@ savomart-sde-intern-task-2026/
 │       ├── components/       AppHeader, Logo, ProtectedRoute, Toast,
 │       │                     PointsCard, TierBadge, CouponCard,
 │       │                     TransactionRow, Skeleton
-│       └── pages/            Login, Dashboard
+│       └── pages/            Login, Dashboard, Offers
 └── README.md
 ```
 
@@ -94,6 +95,26 @@ savomart-sde-intern-task-2026/
 - **Profile sidebar** on desktop, stacks under coupons on mobile
 - **Skeleton loaders** on every async section — no blank states
 - **Toast system** for clipboard + future error states
+
+## What ships in Phase 3
+
+### Backend
+- `GET /api/offers` accepts `scope=sitewide|specific`, `category=<name>`, `expiring_soon=true`, `eligible_only=true`, and `q=<search>` — all combine
+- Server pre-computes `days_remaining` and `is_eligible` so the client never has to do date math or tier comparisons
+- Expired offers (`valid_until < now`) are filtered out unconditionally
+- Returns a `categories` list pulled from active offers — UI doesn't need a separate request
+
+### Seed data
+18 hand-written offers across 14 categories — sitewide deals, store-specific (Indiranagar / Koramangala / Whitefield), tier-locked (Silver+, Gold+), and a couple deliberately expiring in 1–2 days to surface the "expiring soon" badge. Brand names are realistic for the Indian grocery context (Amul, Britannia, Tata Tea, Lay's, Haldiram's, etc.).
+
+### Frontend offers page
+- Scope chips: All · Sitewide · Store-only · Expiring soon · For me (eligible to my tier)
+- Category chip strip from the server-returned list (horizontal scroll on mobile)
+- Search input with 250 ms debounce, matches title/description/category
+- Offer cards: emoji category icon, discount badge, scope tag (📍 store name or "All stores"), tier-required pill, expiring-soon clock badge under 3 days
+- Tier-locked offers render at 70% opacity with a "Locked" pill — visible but clearly inaccessible (better than hiding them)
+- Empty state with a reset-filters CTA
+- Bottom navigation: Home / Offers / Stores / Help — slides under content, sticky, yellow underline on active tab
 
 ## Data model (current)
 

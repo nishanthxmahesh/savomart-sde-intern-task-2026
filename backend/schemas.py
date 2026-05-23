@@ -104,3 +104,29 @@ class TransactionResponse(BaseModel):
     delta: int
     description: str
     created_at: datetime
+
+
+# ---------- Offers ----------
+
+class OfferResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    description: str
+    discount_label: str
+    category: str
+    valid_from: datetime
+    valid_until: datetime
+    store_scope: str
+    store_id: Optional[str]
+    store_name: Optional[str]
+    tier_required: Optional[str]
+    days_remaining: int
+    is_eligible: bool
+
+
+class OffersListResponse(BaseModel):
+    items: list[OfferResponse]
+    total: int
+    categories: list[str]
