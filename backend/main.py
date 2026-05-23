@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers import auth, offers, profile
+from routers import auth, offers, profile, stores
 from seed import run_seed
 
 
@@ -44,3 +44,4 @@ def root():
 app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(offers.router)
+app.include_router(stores.router)

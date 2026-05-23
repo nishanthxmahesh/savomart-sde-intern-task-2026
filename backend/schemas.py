@@ -130,3 +130,25 @@ class OffersListResponse(BaseModel):
     items: list[OfferResponse]
     total: int
     categories: list[str]
+
+
+# ---------- Stores ----------
+
+class StoreResponse(BaseModel):
+    id: str
+    name: str
+    address: str
+    area: Optional[str] = None
+    city: Optional[str] = None
+    latitude: float
+    longitude: float
+    phone: Optional[str] = None
+    hours: Optional[str] = None
+    is_operational: bool = True
+
+
+class StoresListResponse(BaseModel):
+    items: list[StoreResponse]
+    total: int
+    source: str  # "live" | "fallback"
+    fetched_at: datetime

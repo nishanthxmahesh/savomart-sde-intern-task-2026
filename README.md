@@ -2,7 +2,7 @@
 
 A customer-facing loyalty companion for Savomart shoppers — points, offers, store discovery, and support in one place. Built as the SDE Intern take-home challenge.
 
-> **Status:** Phase 3 of 6 — offers browser with category filters, search, expiring-soon surfacing, and tier-locked offers. Bottom navigation now wired across pages. Working end-to-end locally. More phases land in subsequent commits.
+> **Status:** Phase 4 of 6 — interactive store map (Leaflet + OpenStreetMap), live-API proxy with 5-min cache and resilient fallback, browser geolocation + haversine nearest-store. Working end-to-end locally. More phases land in subsequent commits.
 
 ## Quick start
 
@@ -66,7 +66,8 @@ savomart-sde-intern-task-2026/
 │   └── routers/
 │       ├── auth.py           /api/auth/send-otp · /verify-otp
 │       ├── profile.py        /api/profile/me · /coupons · /transactions
-│       └── offers.py         /api/offers (scope · category · expiring · search · eligibility)
+│       ├── offers.py         /api/offers (scope · category · expiring · search · eligibility)
+│       └── stores.py         /api/stores (live-API proxy + 5-min cache + fallback)
 ├── frontend/                 React 19 + Vite + Tailwind v3
 │   └── src/
 │       ├── api/              axios client + auth/profile API
@@ -74,7 +75,7 @@ savomart-sde-intern-task-2026/
 │       ├── components/       AppHeader, Logo, ProtectedRoute, Toast,
 │       │                     PointsCard, TierBadge, CouponCard,
 │       │                     TransactionRow, Skeleton
-│       └── pages/            Login, Dashboard, Offers
+│       └── pages/            Login, Dashboard, Offers, Stores
 └── README.md
 ```
 
@@ -115,6 +116,43 @@ savomart-sde-intern-task-2026/
 - Tier-locked offers render at 70% opacity with a "Locked" pill — visible but clearly inaccessible (better than hiding them)
 - Empty state with a reset-filters CTA
 - Bottom navigation: Home / Offers / Stores / Help — slides under content, sticky, yellow underline on active tab
+
+## What ships in Phase 4
+
+### Backend
+- `GET /api/stores` proxies the live Savomart stores API at
+  `https://internal-service.savomart.in/bridge/api/store/list?is_operational=True`
+  with the `X-cron-token` header. **The token never reaches the browser.**
+- 5-minute in-memory cache (`stores_cache_ttl_seconds`), so the upstream
+  doesn't get hammered on every page load. `?refresh=true` bypasses it.
+- **Fallback path** — if the upstream errors, times out, or returns an
+  unparseable shape, the endpoint silently serves 8 hand-curated Bangalore
+  stores. The response shape is identical (`source: "live"` vs
+  `"fallback"`), so the map never sees an error.
+- `_normalize()` accepts several plausible upstream payload variations
+  (list, `{data: [...]}`, `{stores: [...]}`, lat/lng vs latitude/longitude,
+  etc.) — defensive parsing because the upstream contract isn't documented.
+- Returns `source` and `fetched_at` so the UI can surface a tiny
+  "offline catalogue" hint when running on the fallback set.
+
+### Frontend stores page
+- **Interactive map** — Leaflet + OpenStreetMap tiles. Custom purple
+  divIcon markers (no broken default asset paths under Vite).
+- **Sidebar list synced with map** — clicking a list item flies the map
+  to that store with a smooth 0.8s animation and pops its popup.
+- **Find My Nearest Store** — browser geolocation (one-shot), haversine
+  distance to every store (formula in `utils/haversine.js`, written from
+  scratch), sorts the list ascending, badges the nearest with a yellow
+  "Nearest" pill and a pulsing CSS ring around its marker. User position
+  rendered as a yellow-fill purple-stroke circle.
+- **Search/filter** — single input matches across name + address + area +
+  city, real React state, filters both the list and the markers shown.
+- **Mobile view toggle** — Map / List switch on narrow screens; on lg+
+  the sidebar (340px) and map render side-by-side.
+- **Skeleton loaders** while fetching; map is never empty — fallback
+  ensures the page always renders something useful.
+- Popup includes name, address, hours, phone (`tel:` link), and a
+  Google Maps directions deep link.
 
 ## Data model (current)
 

@@ -42,3 +42,42 @@
     animation: shimmer 1.8s linear infinite;
   }
 }
+
+/* ---------- Leaflet branded markers ---------- */
+.savo-marker-wrap { background: transparent; border: none; }
+.savo-marker {
+  width: 34px; height: 34px; border-radius: 999px;
+  background: #782B90; color: #FFF200;
+  display: grid; place-items: center;
+  font-weight: 800; font-size: 16px;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(120,43,144,0.45);
+  transition: transform 0.15s ease;
+}
+.savo-marker:hover { transform: scale(1.08); }
+.savo-marker-pulse {
+  position: relative;
+  background: #FFF200; color: #782B90;
+  border-color: #782B90;
+}
+.savo-marker-pulse::before {
+  content: ''; position: absolute; inset: -6px;
+  border-radius: 999px;
+  border: 2px solid #782B90;
+  animation: savoPulseRing 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+@keyframes savoPulseRing {
+  0%   { transform: scale(0.85); opacity: 0.9; }
+  70%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Leaflet popup brand tweaks */
+.leaflet-popup-content-wrapper {
+  border-radius: 14px !important;
+  box-shadow: 0 8px 24px -8px rgba(120,43,144,0.25) !important;
+}
+.leaflet-popup-content { margin: 12px 14px !important; }
+.leaflet-popup-tip { background: white !important; }
+.leaflet-container { font-family: inherit; }
+
