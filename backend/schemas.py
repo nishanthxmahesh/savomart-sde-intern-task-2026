@@ -152,3 +152,60 @@ class StoresListResponse(BaseModel):
     total: int
     source: str  # "live" | "fallback"
     fetched_at: datetime
+
+
+# ---------- Support ----------
+
+SUPPORT_CATEGORIES = [
+    "Points Issue",
+    "Coupon Problem",
+    "Store Complaint",
+    "Delivery Issue",
+    "App Feedback",
+    "Other",
+]
+
+
+class SupportInfoResponse(BaseModel):
+    phone: str
+    email: str
+    hours: str
+    response_time_hours: int
+    categories: list[str]
+
+
+class CreateTicketRequest(BaseModel):
+    category: str = Field(..., min_length=1)
+    subject: str = Field(..., min_length=3, max_length=200)
+    description: str = Field(..., min_length=20, max_length=4000)
+
+    @field_validator("category")
+    @classmethod
+    def category_in_list(cls, v: str) -> str:
+        v = v.strip()
+        if v not in SUPPORT_CATEGORIES:
+            raise ValueError(f"category must be one of {SUPPORT_CATEGORIES}")
+        return v
+
+    @field_validator("subject", "description")
+    @classmethod
+    def trim(cls, v: str) -> str:
+        return v.strip()
+
+
+class TicketResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    public_id: str
+    category: str
+    subject: str
+    description: str
+    status: str
+    source: str
+    created_at: datetime
+
+
+class TicketCreatedResponse(BaseModel):
+    ticket: TicketResponse
+    message: str
+    response_time_hours: int

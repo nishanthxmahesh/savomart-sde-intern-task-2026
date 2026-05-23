@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Offers from './pages/Offers';
 import Stores from './pages/Stores';
+import Support from './pages/Support';
 
 export default function App() {
   return (
@@ -35,6 +36,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Stores />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/support"
+              element={
+                <ProtectedRoute>
+                  <Support />
                 </ProtectedRoute>
               }
             />

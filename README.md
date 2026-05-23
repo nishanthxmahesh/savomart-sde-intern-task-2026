@@ -2,7 +2,7 @@
 
 A customer-facing loyalty companion for Savomart shoppers — points, offers, store discovery, and support in one place. Built as the SDE Intern take-home challenge.
 
-> **Status:** Phase 4 of 6 — interactive store map (Leaflet + OpenStreetMap), live-API proxy with 5-min cache and resilient fallback, browser geolocation + haversine nearest-store. Working end-to-end locally. More phases land in subsequent commits.
+> **Status:** Phase 5 of 6 — customer support page with contact card, ticket form, success screen, and "My Tickets" history with status badges. Working end-to-end locally. Final polish phase + AI chat-agent bonus land in subsequent commits.
 
 ## Quick start
 
@@ -67,7 +67,8 @@ savomart-sde-intern-task-2026/
 │       ├── auth.py           /api/auth/send-otp · /verify-otp
 │       ├── profile.py        /api/profile/me · /coupons · /transactions
 │       ├── offers.py         /api/offers (scope · category · expiring · search · eligibility)
-│       └── stores.py         /api/stores (live-API proxy + 5-min cache + fallback)
+│       ├── stores.py         /api/stores (live-API proxy + 5-min cache + fallback)
+│       └── support.py        /api/support/info · /ticket · /my-tickets
 ├── frontend/                 React 19 + Vite + Tailwind v3
 │   └── src/
 │       ├── api/              axios client + auth/profile API
@@ -75,7 +76,7 @@ savomart-sde-intern-task-2026/
 │       ├── components/       AppHeader, Logo, ProtectedRoute, Toast,
 │       │                     PointsCard, TierBadge, CouponCard,
 │       │                     TransactionRow, Skeleton
-│       └── pages/            Login, Dashboard, Offers, Stores
+│       └── pages/            Login, Dashboard, Offers, Stores, Support
 └── README.md
 ```
 
@@ -153,6 +154,30 @@ savomart-sde-intern-task-2026/
   ensures the page always renders something useful.
 - Popup includes name, address, hours, phone (`tel:` link), and a
   Google Maps directions deep link.
+
+## What ships in Phase 5
+
+### Backend
+- `GET /api/support/info` — phone (`1800-202-2026`), email (`support@savomart.in`), hours (Mon–Sat 9am–7pm IST), `response_time_hours`, and the canonical category list (server is the source of truth for these — the form populates its dropdown from this response)
+- `POST /api/support/ticket` — JWT-protected; user is auto-attached from the token, so the body only needs `category`, `subject`, `description`. Server validates: category must be in the canonical list, subject 3–200 chars, description 20–4000 chars. Ticket gets a public id of the form `SAVO-XXXX` (4 hex chars, unique-indexed). Returns the ticket + a personalized message + the response-time SLA.
+- `GET /api/support/my-tickets` — JWT-protected; returns the caller's own tickets, descending by `created_at`. Other users' tickets are never visible.
+- Validation behavior verified with curl: short description → 422, bad category → 422, missing auth → 401.
+
+### Frontend support page
+- **Contact card** with three tappable cells: 📞 toll-free (`tel:` link, branded purple), ✉ email (`mailto:` link), 🕒 hours
+- **Tabs** — "New ticket" / "My tickets · N" (count shown once loaded)
+- **Ticket form:**
+  - Auto-populated read-only Name + Mobile fields rendered as disabled inputs from the JWT user — visible confirmation that "we know who you are"
+  - Category `<select>` populated from `/api/support/info`
+  - Subject input (max 200 chars)
+  - Description textarea with **live character counter** showing `N/20 min` — color states: gray (empty), red (under min), emerald (met). Inline helper text explains why we need the minimum.
+  - Submit button disabled until all fields valid; spinner during request
+- **Success screen** with an animated checkmark (CSS keyframes: emerald disc bursts in, white tick stroke draws over 0.4s, ring-shadow pulse fades out), the `SAVO-XXXX` ticket id in a chip, category + response-time summary, and CTAs to view tickets or submit another.
+- **My Tickets list** — each ticket shows public id (purple-on-purple-50 chip), status badge, category tag, subject, truncated description, and relative time. Status badges:
+  - **Open** → amber `bg-amber-50 text-amber-800` with amber dot
+  - **In progress** → sky `bg-sky-50 text-sky-800` with sky dot
+  - **Resolved** → emerald `bg-emerald-50 text-emerald-800` with emerald dot
+- Empty state on the My Tickets tab routes back to the form.
 
 ## Data model (current)
 
