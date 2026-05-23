@@ -66,3 +66,41 @@ class VerifyOTPResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserSummary
+
+
+# ---------- Profile ----------
+
+class ProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    mobile_number: str
+    points_balance: int
+    tier: str
+    member_since: datetime
+    next_tier: Optional[str]
+    points_to_next_tier: Optional[int]
+    tier_progress_percent: int
+
+
+class CouponResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    discount_value: int
+    discount_type: str
+    description: str
+    expires_at: datetime
+    applicable_store_id: Optional[str]
+    days_remaining: int
+
+
+class TransactionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    delta: int
+    description: str
+    created_at: datetime

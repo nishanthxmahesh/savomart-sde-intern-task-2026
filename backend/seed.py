@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Idempotent seed: creates demo users, coupons, transactions, offers."""
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,8 @@ from models import (
     Tier,
     User,
 )
+
+INR = "₹"
 
 
 def _now() -> datetime:
@@ -34,11 +37,11 @@ def _seed_transactions_for(db: Session, user: User) -> None:
     if db.query(PointsTransaction).filter(PointsTransaction.user_id == user.id).count() > 0:
         return
     history = [
-        (180, "Earned: grocery purchase ₹720", 2),
-        (250, "Earned: weekend shop ₹1,000", 8),
-        (-100, "Redeemed: ₹25 off coupon", 14),
+        (180, f"Earned: grocery purchase {INR}720", 2),
+        (250, f"Earned: weekend shop {INR}1,000", 8),
+        (-100, f"Redeemed: {INR}25 off coupon", 14),
         (320, "Earned: Saturday double points", 21),
-        (60, "Earned: bakery purchase ₹240", 29),
+        (60, f"Earned: bakery purchase {INR}240", 29),
     ]
     for delta, desc, days_ago in history:
         db.add(
@@ -55,11 +58,11 @@ def _seed_coupons_for(db: Session, user: User, count: int) -> None:
     if db.query(Coupon).filter(Coupon.user_id == user.id).count() > 0:
         return
     templates = [
-        ("WELCOME50", 50, DiscountType.FLAT, "₹50 off on orders above ₹500", 25),
+        ("WELCOME50", 50, DiscountType.FLAT, f"{INR}50 off on orders above {INR}500", 25),
         ("FRESH10", 10, DiscountType.PERCENT, "10% off Fresh Produce", 14),
         ("DAIRY15", 15, DiscountType.PERCENT, "15% off Dairy & Eggs", 21),
         ("BAKERY20", 20, DiscountType.PERCENT, "20% off Bakery items", 10),
-        ("GOLD100", 100, DiscountType.FLAT, "Gold-tier ₹100 off — sitewide", 30),
+        ("GOLD100", 100, DiscountType.FLAT, f"Gold-tier {INR}100 off — sitewide", 30),
     ]
     for code, value, dtype, desc, days in templates[:count]:
         db.add(
@@ -113,9 +116,9 @@ def _seed_offers(db: Session) -> None:
             tier_required=None,
         ),
         dict(
-            title="₹50 off on ₹500+ purchase",
-            description="Use code SAVO50 at the counter. Min cart value ₹500.",
-            discount_label="₹50 OFF",
+            title=f"{INR}50 off on {INR}500+ purchase",
+            description=f"Use code SAVO50 at the counter. Min cart value {INR}500.",
+            discount_label=f"{INR}50 OFF",
             category="Sitewide",
             valid_from=now,
             valid_until=now + timedelta(days=7),
@@ -193,9 +196,9 @@ def run_seed() -> None:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        gold = _ensure_user(db, "9999999999", "Aanya Sharma", 4250, Tier.GOLD)
-        silver = _ensure_user(db, "8888888888", "Rahul Mehta", 1100, Tier.SILVER)
-        bronze = _ensure_user(db, "7777777777", "Priya Iyer", 230, Tier.BRONZE)
+        gold = _ensure_user(db, "9999999999", "Aanya Sharma", 5400, Tier.GOLD)
+        silver = _ensure_user(db, "8888888888", "Rahul Mehta", 2750, Tier.SILVER)
+        bronze = _ensure_user(db, "7777777777", "Priya Iyer", 420, Tier.BRONZE)
         db.flush()
 
         _seed_transactions_for(db, gold)
