@@ -32,12 +32,32 @@ export function registerUnauthorizedHandler(fn) {
   onUnauthorized = fn;
 }
 
+let onUnexpectedError = null;
+export function registerUnexpectedErrorHandler(fn) {
+  onUnexpectedError = fn;
+}
+
+// "Loud" failures: surfaced via toast.
+// Skips 4xx validation errors (caller-handled inline) and the auth endpoints
+// during login (caller already shows the message in the form).
+function isLoudFailure(err) {
+  const status = err?.response?.status;
+  const url = err?.config?.url || '';
+  if (url.includes('/api/auth/')) return false;
+  if (!status) return true; // network / CORS / timeout
+  if (status >= 500) return true;
+  if (status === 408 || status === 429) return true;
+  return false;
+}
+
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err?.response?.status === 401) {
       setToken(null);
       if (typeof onUnauthorized === 'function') onUnauthorized();
+    } else if (isLoudFailure(err) && typeof onUnexpectedError === 'function') {
+      onUnexpectedError(apiErrorMessage(err));
     }
     return Promise.reject(err);
   },

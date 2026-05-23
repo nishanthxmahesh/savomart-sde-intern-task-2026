@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { registerUnexpectedErrorHandler } from '../api/client';
 
 const ToastContext = createContext(null);
 
@@ -18,6 +19,20 @@ export function ToastProvider({ children }) {
     },
     [dismiss],
   );
+
+  // Wire the axios "loud failure" interceptor to surface a toast.
+  // Debounce identical messages within 5s so a hung backend doesn't spam.
+  useEffect(() => {
+    let lastMsg = null;
+    let lastAt = 0;
+    registerUnexpectedErrorHandler((msg) => {
+      const now = Date.now();
+      if (msg === lastMsg && now - lastAt < 5000) return;
+      lastMsg = msg;
+      lastAt = now;
+      show(msg, { kind: 'error', timeoutMs: 3000 });
+    });
+  }, [show]);
 
   const value = useMemo(() => ({ show, dismiss }), [show, dismiss]);
 

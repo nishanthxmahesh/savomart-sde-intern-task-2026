@@ -61,7 +61,8 @@ export default function Stores() {
   // selection in sync visually.
   const handleSelect = (id) => {
     setSelectedStoreId(id);
-    if (window.innerWidth < 1024) setMobileView('map');
+    // On phones (no md+ side-by-side), bring the map back into view.
+    if (window.innerWidth < 768) setMobileView('map');
   };
 
   return (
@@ -101,8 +102,8 @@ export default function Stores() {
           </button>
         </div>
 
-        {/* Mobile view toggle */}
-        <div className="lg:hidden mb-3 flex rounded-xl border border-savo-purple-100 bg-white p-1 text-sm">
+        {/* View toggle (mobile only — md+ shows sidebar + map together) */}
+        <div className="md:hidden mb-3 flex rounded-xl border border-savo-purple-100 bg-white p-1 text-sm">
           {['map', 'list'].map((v) => (
             <button
               key={v}
@@ -118,10 +119,10 @@ export default function Stores() {
           ))}
         </div>
 
-        <div className="flex-1 grid lg:grid-cols-[340px_1fr] gap-4 min-h-0">
+        <div className="flex-1 grid md:grid-cols-[320px_1fr] lg:grid-cols-[360px_1fr] gap-4 min-h-0">
           {/* Sidebar */}
           <aside
-            className={`min-h-0 flex flex-col ${mobileView === 'list' ? 'flex' : 'hidden'} lg:flex`}
+            className={`min-h-0 flex flex-col ${mobileView === 'list' ? 'flex' : 'hidden'} md:flex`}
             style={{ minHeight: 360 }}
           >
             {loading ? (
@@ -145,7 +146,7 @@ export default function Stores() {
 
           {/* Map */}
           <section
-            className={`min-h-[360px] lg:min-h-0 ${mobileView === 'map' ? 'block' : 'hidden'} lg:block`}
+            className={`min-h-[360px] md:min-h-0 ${mobileView === 'map' ? 'block' : 'hidden'} md:block`}
           >
             {loading ? (
               <SkeletonBlock className="h-full w-full min-h-[360px]" />

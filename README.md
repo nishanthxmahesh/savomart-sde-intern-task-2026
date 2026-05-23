@@ -2,7 +2,7 @@
 
 A customer-facing loyalty companion for Savomart shoppers — points, offers, store discovery, and support in one place. Built as the SDE Intern take-home challenge.
 
-> **Status:** Phase 5 of 6 — customer support page with contact card, ticket form, success screen, and "My Tickets" history with status badges. Working end-to-end locally. Final polish phase + AI chat-agent bonus land in subsequent commits.
+> **Status:** All 6 core phases shipped — auth, dashboard, offers, stores+map, support, polished navigation. AI chat-agent bonus + deployment land next.
 
 ## Quick start
 
@@ -178,6 +178,19 @@ savomart-sde-intern-task-2026/
   - **In progress** → sky `bg-sky-50 text-sky-800` with sky dot
   - **Resolved** → emerald `bg-emerald-50 text-emerald-800` with emerald dot
 - Empty state on the My Tickets tab routes back to the form.
+
+## What ships in Phase 6 (nav + polish)
+
+- **BottomNav** (mobile/tablet, hidden on lg+) — Home / Offers / Stores / Support. 60px tall, sticky, brand purple icon+label when active with a yellow underline indicator. Respects `safe-area-inset-bottom` for notched phones.
+- **AppHeader** (all screens) — Savomart wordmark links Home; desktop nav links between pages on lg+ (so once you're past 1024px the bottom nav goes away and the header takes over); a non-functional notification bell with a yellow dot ("coming soon" tooltip); and a clickable initials avatar that opens a small account menu with the user's name + mobile and a Log out action. Menu closes on outside-click or Escape.
+- **Protected routes** — every page except `/login` is wrapped in `<ProtectedRoute>`. axios response interceptor intercepts every `401`: clears the local token, fires a registered `onUnauthorized` callback that wipes React auth state, and the next render of `<ProtectedRoute>` redirects to `/login` with a `state.from` so the post-login flow returns the user to where they were trying to go. Verified: bogus / missing token returns 401 on `/profile/me`, `/stores`, `/support/*`.
+- **Global error toast** — the axios interceptor now also flags "loud" failures (network errors, timeouts, 408/429/5xx) and dispatches a toast through a registered `onUnexpectedError` handler. Validation 4xx errors and the auth endpoints are excluded — those keep their inline error rendering. Identical messages are debounced (5s window) so a hung backend doesn't spam.
+- **Skeleton loaders** — every async section has a shimmer skeleton: Dashboard (points card, coupons strip, transactions, profile sidebar), Offers (card list), Stores (sidebar list + full-height map), Support (contact card + tickets list). No blank screens, ever.
+- **Logout** — explicit `navigate('/login', { replace: true })` after `logout()` so users who tap the menu item land cleanly on the login page, no flicker.
+- **Responsive breakpoints**:
+  - **375px (phone)** — single column everywhere, BottomNav at the bottom, Stores page has a Map/List view toggle (side-by-side doesn't fit)
+  - **768px (tablet)** — Stores page reveals the sidebar alongside the map (per spec); Offers list goes two-column
+  - **1024px+ (laptop)** — desktop nav appears in the header, BottomNav disappears, Dashboard becomes 2/3 + 1/3 grid (main column + sidebar)
 
 ## Data model (current)
 
