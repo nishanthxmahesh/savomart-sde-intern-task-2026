@@ -13,6 +13,7 @@ from security import get_current_user
 
 router = APIRouter(prefix="/api/offers", tags=["offers"])
 
+# "Expiring soon" = strictly under 3 days remaining (matches the badge rule)
 EXPIRING_SOON_DAYS = 3
 _TIER_RANK = {t.value: i for i, (t, _) in enumerate(TIER_THRESHOLDS)}
 
@@ -73,7 +74,7 @@ def list_offers(
     items: list[OfferResponse] = []
     for o in offers:
         days = _days_remaining(o.valid_until, now)
-        if expiring_soon and days > EXPIRING_SOON_DAYS:
+        if expiring_soon and days >= EXPIRING_SOON_DAYS:
             continue
         eligible = _is_eligible(o, user_tier)
         if eligible_only and not eligible:

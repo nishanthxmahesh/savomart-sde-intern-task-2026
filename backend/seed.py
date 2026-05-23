@@ -302,7 +302,8 @@ def run_seed() -> None:
         _seed_offers(db)
 
         db.commit()
-        print("[seed] demo data ready: 3 users, coupons, transactions, 10 offers", flush=True)
+        offer_count = db.query(Offer).count()
+        print(f"[seed] demo data ready: 3 users, coupons, transactions, {offer_count} offers", flush=True)
     finally:
         db.close()
 

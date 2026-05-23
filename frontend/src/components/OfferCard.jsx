@@ -25,7 +25,7 @@ function formatExpiry(daysRemaining) {
 }
 
 export default function OfferCard({ offer }) {
-  const expiring = offer.days_remaining <= 3;
+  const expiring = offer.days_remaining < 3;
   const tierLocked = offer.tier_required && !offer.is_eligible;
   const icon = CATEGORY_ICONS[offer.category] || '🏷️';
 
