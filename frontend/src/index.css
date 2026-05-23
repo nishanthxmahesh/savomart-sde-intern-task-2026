@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-savo-mist text-savo-ink antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .savo-btn {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed select-none;
+  }
+  .savo-btn-primary {
+    @apply savo-btn bg-savo-purple text-savo-yellow hover:bg-savo-purple-dark shadow-savo-glow;
+  }
+  .savo-btn-secondary {
+    @apply savo-btn bg-white text-savo-purple border border-savo-purple-100 hover:bg-savo-purple-50;
+  }
+  .savo-card {
+    @apply bg-white rounded-2xl shadow-savo-card border border-savo-purple-100/50;
+  }
+  .savo-input {
+    @apply w-full px-4 py-3 rounded-xl border border-savo-purple-100 bg-white text-savo-ink placeholder:text-savo-ink/40 focus:outline-none focus:ring-2 focus:ring-savo-purple/40 focus:border-savo-purple transition;
+  }
+  .savo-otp-cell {
+    @apply w-12 h-14 text-center text-2xl font-bold rounded-xl border-2 border-savo-purple-100 bg-white text-savo-purple focus:outline-none focus:border-savo-purple focus:ring-2 focus:ring-savo-purple/30 transition;
+  }
+  .savo-shimmer {
+    background-image: linear-gradient(90deg, rgba(229,210,238,0.3) 0%, rgba(229,210,238,0.6) 50%, rgba(229,210,238,0.3) 100%);
+    background-size: 800px 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+}

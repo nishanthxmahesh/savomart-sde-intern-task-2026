@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+backend/.venv/
+backend/env/
+*.egg-info/
+.pytest_cache/
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Excel exports
+backend/exports/*.xlsx
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Build
+build/
