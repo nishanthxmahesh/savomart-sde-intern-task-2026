@@ -3,6 +3,7 @@ import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from config import settings
@@ -124,12 +125,22 @@ def create_ticket(
         chat_transcript=payload.chat_transcript,
         created_at=_now(),
     )
-    db.add(ticket)
-    db.commit()
-    db.refresh(ticket)
+    try:
+        db.add(ticket)
+        db.commit()
+        db.refresh(ticket)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        log.exception("create_ticket DB failure: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Couldn't save your ticket right now. Please try again.",
+        ) from exc
 
     # Excel append happens for every ticket (form or chat). The "Source"
     # column lets the support team filter chat-originated ones if needed.
+    # excel_export wraps its own failures — we don't fail the request if
+    # writing the spreadsheet hits an IO snag.
     _export_ticket_to_excel(user, ticket)
 
     return TicketCreatedResponse(
@@ -172,20 +183,42 @@ def list_my_tickets(
     ]
 
 
+CHAT_FALLBACK_MESSAGE = (
+    "Sorry — I'm having a quick technical hiccup and couldn't think that one through. "
+    "Could you try again in a moment? If it keeps happening, the ticket form on this page "
+    "will still go straight to our team."
+)
+CHAT_NOT_CONFIGURED_MESSAGE = (
+    "Hey! Our AI assistant isn't enabled in this environment yet. The ticket form below "
+    "still goes straight to our support team and we'll respond within 24 hours."
+)
+
+
 @router.post("/chat", response_model=ChatResponse)
 def chat(
     payload: ChatRequest,
     user: User = Depends(get_current_user),
 ):
+    # Production rule: never return a 5xx from the chat endpoint. If the
+    # assistant can't respond for any reason — missing key, API down, rate
+    # limit, malformed payload — return a friendly assistant-style message
+    # so the chat drawer renders it as a normal Savo bubble. The user
+    # always sees SOMETHING; the form path keeps working as a fallback.
     if not settings.groq_api_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Chat assistant is not configured. Add GROQ_API_KEY to backend/.env to enable it.",
+        return ChatResponse(
+            role="assistant",
+            content=CHAT_NOT_CONFIGURED_MESSAGE,
+            model="fallback",
         )
 
-    # Local import so the rest of the API still boots without groq being
-    # configured (handy in dev / for evaluators who haven't set the key).
-    from groq import Groq
+    # Local import so the API still boots without groq being installed
+    # (the dependency is in requirements.txt but this gives us belt-and-
+    # suspenders behaviour in case of a partial install).
+    try:
+        from groq import Groq
+    except ImportError as exc:
+        log.warning("groq sdk not installed: %s", exc)
+        return ChatResponse(role="assistant", content=CHAT_FALLBACK_MESSAGE, model="fallback")
 
     # Prepend the system prompt + a tiny user-context block so Savo can
     # greet the customer by name without re-asking.
@@ -203,19 +236,18 @@ def chat(
         messages.append({"role": m.role, "content": m.content})
 
     try:
-        client = Groq(api_key=settings.groq_api_key)
+        client = Groq(api_key=settings.groq_api_key, timeout=15.0)
         completion = client.chat.completions.create(
             model=settings.ai_model,
             messages=messages,
             temperature=0.6,
             max_tokens=512,
         )
-        content = completion.choices[0].message.content or ""
-    except Exception as exc:
+        content = (completion.choices[0].message.content or "").strip()
+        if not content:
+            raise ValueError("empty completion content")
+    except Exception as exc:  # noqa: BLE001 — every failure becomes a friendly bubble
         log.warning("Groq call failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Couldn't reach the assistant right now. Please try again or use the form.",
-        )
+        return ChatResponse(role="assistant", content=CHAT_FALLBACK_MESSAGE, model="fallback")
 
     return ChatResponse(role="assistant", content=content, model=settings.ai_model)

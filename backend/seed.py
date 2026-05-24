@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Idempotent seed: creates demo users, coupons, transactions, offers."""
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -17,6 +18,8 @@ from models import (
 )
 
 INR = "₹"
+
+log = logging.getLogger("savomart.seed")
 
 
 def _now() -> datetime:
@@ -303,7 +306,7 @@ def run_seed() -> None:
 
         db.commit()
         offer_count = db.query(Offer).count()
-        print(f"[seed] demo data ready: 3 users, coupons, transactions, {offer_count} offers", flush=True)
+        log.info("demo data ready: 3 users, coupons, transactions, %d offers", offer_count)
     finally:
         db.close()
 

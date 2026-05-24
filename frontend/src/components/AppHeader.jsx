@@ -71,7 +71,7 @@ export default function AppHeader() {
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button
-            className="relative w-9 h-9 rounded-full grid place-items-center text-savo-purple hover:bg-savo-purple-50 transition"
+            className="relative w-11 h-11 rounded-full grid place-items-center text-savo-purple hover:bg-savo-purple-50 transition"
             aria-label="Notifications"
             title="Notifications (coming soon)"
           >
@@ -85,7 +85,7 @@ export default function AppHeader() {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className="w-9 h-9 rounded-full bg-savo-purple text-savo-yellow grid place-items-center font-bold text-sm hover:scale-105 transition shadow-savo-glow"
+              className="w-11 h-11 rounded-full bg-savo-purple text-savo-yellow grid place-items-center font-bold text-sm hover:scale-105 transition shadow-savo-glow"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               aria-label={`Account menu for ${user?.name || 'user'}`}

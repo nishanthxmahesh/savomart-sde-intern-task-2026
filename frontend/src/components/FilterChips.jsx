@@ -3,7 +3,7 @@ export default function FilterChips({ options, value, onChange, scrollable = tru
     <div
       className={
         scrollable
-          ? 'flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 snap-x'
+          ? 'flex gap-2 overflow-x-auto savo-scroll-x pb-1 -mx-4 px-4 snap-x'
           : 'flex flex-wrap gap-2'
       }
     >

@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     ai_model: str = "llama-3.3-70b-versatile"
     groq_api_key: str = ""
 
+    environment: str = "development"  # "development" | "production"
+    frontend_url: str = ""  # additional CORS origin (set in Render env)
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     @property

@@ -130,7 +130,7 @@ export default function Dashboard() {
                   to earn new ones.
                 </div>
               ) : (
-                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory">
+                <div className="flex gap-3 overflow-x-auto savo-scroll-x pb-2 -mx-4 px-4 snap-x snap-mandatory">
                   {coupons.map((c) => (
                     <div key={c.id} className="snap-start">
                       <CouponCard coupon={c} />
