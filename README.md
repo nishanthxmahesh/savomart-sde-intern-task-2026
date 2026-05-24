@@ -14,7 +14,7 @@ A customer-facing loyalty companion for Savomart shoppers — points, offers, st
 | **Video demo (Google Drive)** | _To be added — see commit history for updated link_ |
 | **Repository** | <https://github.com/nishanthxmahesh/savomart-sde-intern-task-2026> |
 
-> **Heads-up on the deployed demo:** Render's free tier sleeps after 15 min idle — the first request takes ~30s to wake the backend. After that it's snappy.
+> **Heads-up on the deployed demo:** Render's free tier sleeps after 15 min idle — the first request takes ~30s to wake the backend. After that it's snappy. Data persists across restarts via Neon Postgres (see [Tech & library choices](#tech--library-choices)).
 
 ---
 
@@ -36,7 +36,7 @@ A customer-facing loyalty companion for Savomart shoppers — points, offers, st
 
 **Prerequisites:** Python **3.11+**, Node **18+**, npm.
 
-### 1. Backend (FastAPI · SQLite · JWT) — port 8000
+### 1. Backend (FastAPI · SQLite locally / Postgres in prod · JWT) — port 8000
 
 ```powershell
 cd backend
@@ -49,6 +49,8 @@ copy .env.example .env                       # default values work for local dev
 The API boots at <http://127.0.0.1:8000>. Open `/docs` for the OpenAPI explorer.
 
 The SQLite database (`backend/savomart.db`) is **created and seeded automatically** on first run — 3 demo customers, 2 admins, 18 offers, sample coupons, sample transactions.
+
+> **Locally** you get SQLite for zero-setup dev. **On the deployed backend** the same code reads a `DATABASE_URL` env var and runs against Neon Postgres instead, so admin-created customers and Excel imports survive redeploys. Switching back and forth is a connection-string change — see [backend/database.py](backend/database.py).
 
 ### 2. Frontend (React 19 · Vite · Tailwind v3) — port 5173
 
@@ -200,7 +202,7 @@ Changing thresholds is a 3-line edit; `tier_for_balance()` and `progress_to_next
 | Choice | Why |
 |---|---|
 | **FastAPI** | Async-friendly, Pydantic-validated request/response, auto OpenAPI docs at `/docs`. Saved a lot of boilerplate vs Flask + marshmallow. |
-| **SQLite + SQLAlchemy 2.0** | Zero-setup local DB. ORM-first schema. Switching to Postgres later is a connection-string change — no app code changes. |
+| **SQLite (local) + Postgres on Neon (prod), SQLAlchemy 2.0** | Same ORM, two backends — picked at startup based on whether `DATABASE_URL` is set. SQLite means zero-setup dev; Neon is a free, scale-to-zero serverless Postgres so the deployed demo persists customers/imports across restarts without me having to pay for a database. |
 | **JWT (HS256, 7-day customer · 8-hour admin)** | Stateless, lives in localStorage, simple axios interceptor. Separate secrets for the two namespaces means a leaked customer token can never authenticate admin endpoints (and vice versa — verified with curl). |
 | **Mock OTP via console + dev_otp** | Brief allows mock. Returning the OTP in the response means the demo URL works without server log access — critical for a reviewer trying the app on their phone. |
 | **openpyxl** | Pure Python, no system deps. Used for both the support-ticket export and the customer Excel import. |
@@ -224,7 +226,7 @@ Changing thresholds is a 3-line edit; `tier_for_balance()` and `progress_to_next
 - **Self-signup disabled, registration via admin only** — matches a real loyalty program's enrollment flow (cashier creates the account at the store). The login page surfaces a clear "register at Savomart" screen for unknown mobiles instead of silently creating a stub user.
 - **Excel import as the loyalty rules engine** — a single .xlsx file can simultaneously create new customers, award points from purchases, AND redeem coupons. One round trip, full per-row audit, atomic commit.
 - **JWT in localStorage** — easy to ship and avoids cookie-domain complexity for the take-home. Trade-off (XSS exposure) documented; production should move to httpOnly cookies.
-- **SQLite on the deployed backend** — chosen for zero-setup; the trade-off is that **Render's free tier wipes the filesystem on each redeploy**, so admin-created customers don't persist past a deploy. For a take-home demo where the seed always re-runs this is acceptable.
+- **SQLite locally, Neon Postgres in production** — the [backend/database.py](backend/database.py) bootstrap reads `DATABASE_URL` at startup; if set, it switches to Postgres (with `pool_pre_ping` + 5-min recycle to absorb Neon's idle disconnects) and rewrites legacy `postgres://` URLs to `postgresql://`. If unset, it falls back to a local SQLite file. Same SQLAlchemy 2.0 models work against both — I didn't have to change a single ORM line to migrate.
 - **`useAsync` micro-hook instead of React Query** — React Query is overkill for this size; three lines of `useState` + a `reload` callback covers every fetch I needed.
 - **Bundled PR-style commits per phase** — kept the git log readable as a story rather than micro-commits.
 
@@ -234,8 +236,7 @@ Changing thresholds is a 3-line edit; `tier_for_balance()` and `progress_to_next
 
 **With more time, in priority order:**
 
-1. **Move to Postgres for the deployed backend** so admin-created customers survive a redeploy. Currently SQLite on Render free tier is ephemeral.
-2. **Real SMS via Twilio or MSG91** to replace the mock OTP. The auth router is already structured to swap providers behind a single `send_sms()` call.
+1. **Real SMS via Twilio or MSG91** to replace the mock OTP. The auth router is already structured to swap providers behind a single `send_sms()` call.
 3. **HttpOnly cookies instead of localStorage** for the JWT, with CSRF tokens. Lower XSS exposure.
 4. **Database migrations (Alembic)** — right now schema changes mean dropping `savomart.db`. Fine for greenfield, painful once there's real data.
 5. **Rate limiting on `/api/auth/send-otp`** to prevent OTP spam. Per-IP and per-mobile, sliding-window.
@@ -276,7 +277,7 @@ Every AI-generated change was reviewed before commit. Where the model proposed d
 
 ```
 savomart-sde-intern-task-2026/
-├── backend/                       FastAPI + SQLAlchemy + SQLite
+├── backend/                       FastAPI + SQLAlchemy + (SQLite local / Postgres prod)
 │   ├── main.py                    app factory, CORS, lifespan seed
 │   ├── config.py                  pydantic-settings (.env-driven)
 │   ├── database.py                engine + session
