@@ -104,10 +104,13 @@ def send_otp(payload: SendOTPRequest, db: Session = Depends(get_db)):
         flush=True,
     )
 
+    # Mock SMS — we always echo the OTP back to the client for the demo
+    # (the interviewer needs a way to log in without seeing the server logs).
+    # Replace with real SMS + drop `dev_otp` before going to actual production.
     return SendOTPResponse(
         message="OTP sent. Check your backend console (mock SMS).",
         expires_in=settings.otp_expire_seconds,
-        dev_otp=otp_code if settings.environment != "production" else None,
+        dev_otp=otp_code,
     )
 
 

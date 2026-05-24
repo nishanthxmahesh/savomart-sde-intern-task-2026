@@ -149,6 +149,45 @@ export default function Login() {
     setDigits(next);
   };
 
+  const useDemoMobile = (m) => {
+    setMobile(m);
+    setError('');
+    setTimeout(() => requestOtpForMobile(m), 0);
+  };
+
+  const requestOtpForMobile = async (m) => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await sendOtp(m);
+      setDevOtp(res.dev_otp || '');
+      setStep('otp');
+      setResendIn(30);
+      setDigits(['', '', '', '', '', '']);
+      setTimeout(() => otpRefs.current[0]?.focus(), 50);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 403 && typeof detail === 'object') {
+        if (detail.enrolled === false) {
+          setNotEnrolledMsg(detail.message || "This mobile isn't registered with Savomart.");
+          setStep('not_enrolled');
+          return;
+        }
+        setError(detail.message || 'This account cannot sign in.');
+        return;
+      }
+      setError(apiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const DEMO_MOBILES = [
+    { mobile: '9999999999', name: 'Aanya', tier: 'Gold' },
+    { mobile: '8888888888', name: 'Rahul', tier: 'Silver' },
+    { mobile: '7777777777', name: 'Priya', tier: 'Bronze' },
+  ];
+
   return (
     <div className="min-h-full flex items-center justify-center px-4 py-10 bg-gradient-to-br from-savo-mist via-white to-savo-purple-50">
       <div className="w-full max-w-md animate-slide-up">
@@ -210,6 +249,49 @@ export default function Login() {
                 We'll generate a one-time code for this session.
               </p>
             </form>
+          )}
+
+          {step === 'mobile' && (
+            <>
+              <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-widest text-savo-ink/40 font-semibold">
+                <span className="flex-1 h-px bg-savo-ink/10" />
+                Try a demo account
+                <span className="flex-1 h-px bg-savo-ink/10" />
+              </div>
+
+              <div className="space-y-2">
+                {DEMO_MOBILES.map((d) => (
+                  <button
+                    key={d.mobile}
+                    type="button"
+                    onClick={() => useDemoMobile(d.mobile)}
+                    disabled={loading}
+                    className="w-full flex items-center justify-between gap-2 rounded-xl border border-savo-purple-100 bg-white hover:bg-savo-purple-50 active:bg-savo-purple-50 px-3 py-2.5 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                        d.tier === 'Gold' ? 'bg-savo-yellow-soft text-amber-900' :
+                        d.tier === 'Silver' ? 'bg-slate-100 text-slate-700' :
+                        'bg-amber-100 text-amber-900'
+                      }`}>{d.tier}</span>
+                      <span className="text-sm font-semibold text-savo-ink truncate">{d.name}</span>
+                    </div>
+                    <span className="font-mono text-xs text-savo-ink/70 whitespace-nowrap">
+                      +91 {d.mobile.slice(0, 5)} {d.mobile.slice(5)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-xl bg-savo-purple-50 border border-savo-purple-100 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-savo-purple mb-1">
+                  Want your mobile registered?
+                </p>
+                <p className="text-xs text-savo-ink/70 leading-relaxed">
+                  Self-signup is disabled. Sign in as <strong>admin</strong> and enroll your number from <strong>Customers → Enroll customer</strong>, then come back here to log in.
+                </p>
+              </div>
+            </>
           )}
 
           {step === 'not_enrolled' && (
