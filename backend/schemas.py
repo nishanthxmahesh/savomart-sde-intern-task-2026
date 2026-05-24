@@ -4,52 +4,32 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-# ---------- Auth ----------
+# ---------- Auth (Firebase Phone) ----------
 
-class SendOTPRequest(BaseModel):
+
+def _clean_mobile_value(v: str) -> str:
+    """Normalize an Indian mobile to 10 bare digits (no +91, no spaces)."""
+    v = (v or "").strip().replace(" ", "").replace("-", "")
+    if v.startswith("+91"):
+        v = v[3:]
+    if v.startswith("91") and len(v) == 12:
+        v = v[2:]
+    return v
+
+
+class VerifyFirebaseTokenRequest(BaseModel):
+    firebase_token: str = Field(..., min_length=20, max_length=4096)
     mobile_number: str = Field(..., min_length=10, max_length=15)
 
     @field_validator("mobile_number")
     @classmethod
     def clean_mobile(cls, v: str) -> str:
-        v = v.strip().replace(" ", "").replace("-", "")
-        if v.startswith("+91"):
-            v = v[3:]
-        if v.startswith("91") and len(v) == 12:
-            v = v[2:]
-        if not v.isdigit():
+        cleaned = _clean_mobile_value(v)
+        if not cleaned.isdigit():
             raise ValueError("mobile_number must contain digits only")
-        if len(v) != 10:
+        if len(cleaned) != 10:
             raise ValueError("mobile_number must be 10 digits (Indian)")
-        return v
-
-
-class SendOTPResponse(BaseModel):
-    message: str
-    expires_in: int
-    dev_otp: Optional[str] = None
-
-
-class VerifyOTPRequest(BaseModel):
-    mobile_number: str = Field(..., min_length=10, max_length=15)
-    otp: str = Field(..., min_length=6, max_length=6)
-
-    @field_validator("mobile_number")
-    @classmethod
-    def clean_mobile(cls, v: str) -> str:
-        v = v.strip().replace(" ", "").replace("-", "")
-        if v.startswith("+91"):
-            v = v[3:]
-        if v.startswith("91") and len(v) == 12:
-            v = v[2:]
-        return v
-
-    @field_validator("otp")
-    @classmethod
-    def otp_digits(cls, v: str) -> str:
-        if not v.isdigit():
-            raise ValueError("otp must be 6 digits")
-        return v
+        return cleaned
 
 
 class UserSummary(BaseModel):
@@ -62,10 +42,15 @@ class UserSummary(BaseModel):
     tier: str
 
 
-class VerifyOTPResponse(BaseModel):
+class VerifyFirebaseTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user: UserSummary
+    customer: UserSummary
+
+
+class NotEnrolledResponse(BaseModel):
+    enrolled: bool = False
+    message: str
 
 
 # ---------- Profile ----------
@@ -415,6 +400,28 @@ class AdminTicketUpdate(BaseModel):
 
 
 # --- Users (admin) ---
+
+class AdminCreateCustomerRequest(BaseModel):
+    name: str = Field(..., min_length=2, max_length=120)
+    mobile_number: str = Field(..., min_length=10, max_length=15)
+    initial_points: int = Field(default=0, ge=0, le=100000)
+    tier: Optional[str] = Field(default=None, pattern="^(Bronze|Silver|Gold)$")
+
+    @field_validator("mobile_number")
+    @classmethod
+    def clean(cls, v: str) -> str:
+        cleaned = _clean_mobile_value(v)
+        if not cleaned.isdigit():
+            raise ValueError("mobile_number must contain digits only")
+        if len(cleaned) != 10:
+            raise ValueError("mobile_number must be 10 digits (Indian)")
+        return cleaned
+
+    @field_validator("name")
+    @classmethod
+    def trim_name(cls, v: str) -> str:
+        return v.strip()
+
 
 class AdminUserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

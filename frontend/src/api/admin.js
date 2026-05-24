@@ -157,6 +157,10 @@ export async function fetchAdminUsers(q) {
   const { data } = await adminApi.get('/api/admin/users', { params: q ? { q } : {} });
   return data;
 }
+export async function createAdminCustomer(payload) {
+  const { data } = await adminApi.post('/api/admin/users', payload);
+  return data;
+}
 export async function fetchAdminUserDetail(userId) {
   const { data } = await adminApi.get(`/api/admin/users/${userId}`);
   return data;

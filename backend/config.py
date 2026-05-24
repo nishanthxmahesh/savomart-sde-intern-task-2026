@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     environment: str = "development"  # "development" | "production"
     frontend_url: str = ""  # additional CORS origin (set in Render env)
 
+    # Firebase Admin — minified service account JSON (single line). When unset,
+    # firebase_init falls back to backend/firebase-service-account.json on disk.
+    firebase_service_account_json: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
     @property

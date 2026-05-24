@@ -7,6 +7,7 @@ import { useDebounced } from '../../hooks/useDebounced';
 import {
   adminErrorMessage,
   changeUserTier,
+  createAdminCustomer,
   deactivateUser,
   fetchAdminUserDetail,
   fetchAdminUsers,
@@ -29,14 +30,20 @@ export default function AdminUsers() {
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const debouncedQ = useDebounced(q.trim(), 250);
-  const { data, loading } = useAsync(() => fetchAdminUsers(debouncedQ || undefined), [debouncedQ]);
+  const { data, loading, reload } = useAsync(() => fetchAdminUsers(debouncedQ || undefined), [debouncedQ]);
+  const [createOpen, setCreateOpen] = useState(false);
   const rows = data || [];
 
   return (
     <div>
       <PageHeader
         title="Customers"
-        subtitle="Search any customer, see their full profile, adjust tier or deactivate."
+        subtitle="Enroll new customers, search existing ones, adjust tier or deactivate."
+        actions={[
+          <button key="new" onClick={() => setCreateOpen(true)} className="savo-btn-primary text-sm">
+            + Enroll customer
+          </button>,
+        ]}
       />
 
       <div className="bg-white rounded-2xl border border-slate-200 p-3 mb-4">
@@ -77,7 +84,109 @@ export default function AdminUsers() {
           emptyText="No customers match."
         />
       )}
+
+      <CreateCustomerModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(u) => { setCreateOpen(false); reload(); navigate(`/admin/users/${u.id}`); }}
+      />
     </div>
+  );
+}
+
+function CreateCustomerModal({ open, onClose, onCreated }) {
+  const { show } = useToast();
+  const [form, setForm] = useState({ name: '', mobile_number: '', initial_points: 0, tier: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      const created = await createAdminCustomer({
+        name: form.name.trim(),
+        mobile_number: form.mobile_number.trim(),
+        initial_points: Number(form.initial_points) || 0,
+        tier: form.tier || null,
+      });
+      show(`Enrolled ${created.name}`, { kind: 'success' });
+      setForm({ name: '', mobile_number: '', initial_points: 0, tier: '' });
+      onCreated(created);
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Enroll new customer">
+      <p className="text-xs text-savo-ink/55 mb-4">
+        Since customer self-signup is disabled, every new Savomart customer is enrolled by an admin
+        here. The mobile they provide will be what they sign in with via Firebase.
+      </p>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label="Full name" required>
+          <input
+            type="text"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="savo-input"
+            maxLength={120}
+            required
+            autoFocus
+          />
+        </Field>
+        <Field label="Mobile (10 digits)" required hint="Without +91">
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={form.mobile_number}
+            onChange={(e) => setForm({ ...form, mobile_number: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+            className="savo-input font-mono"
+            placeholder="9876543210"
+            required
+          />
+        </Field>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Initial points" hint="Welcome bonus, if any">
+            <input
+              type="number"
+              min={0}
+              max={100000}
+              value={form.initial_points}
+              onChange={(e) => setForm({ ...form, initial_points: e.target.value })}
+              className="savo-input"
+            />
+          </Field>
+          <Field label="Tier" hint="Blank = auto from points">
+            <select
+              value={form.tier}
+              onChange={(e) => setForm({ ...form, tier: e.target.value })}
+              className="savo-input"
+            >
+              <option value="">Auto</option>
+              <option value="Bronze">Bronze</option>
+              <option value="Silver">Silver</option>
+              <option value="Gold">Gold</option>
+            </select>
+          </Field>
+        </div>
+        {error && <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="savo-btn-secondary text-sm">Cancel</button>
+          <button
+            type="submit"
+            disabled={saving || form.name.trim().length < 2 || form.mobile_number.length !== 10}
+            className="savo-btn-primary text-sm"
+          >
+            {saving ? <Spinner /> : 'Enroll customer'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

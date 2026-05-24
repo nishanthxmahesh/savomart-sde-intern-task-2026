@@ -16,6 +16,11 @@ backend/env/
 *.sqlite
 *.sqlite3
 
+# Firebase service account (NEVER commit)
+backend/firebase-service-account.json
+**/firebase-service-account*.json
+**/serviceAccountKey.json
+
 # Excel exports (local artifacts — directory is checked in via .gitkeep)
 backend/exports/*.xlsx
 !backend/exports/.gitkeep

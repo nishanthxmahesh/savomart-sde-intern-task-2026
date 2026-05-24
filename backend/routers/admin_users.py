@@ -18,6 +18,7 @@ from models import (
     User,
 )
 from schemas import (
+    AdminCreateCustomerRequest,
     AdminTicketOut,
     AdminUserDetail,
     AdminUserOut,
@@ -43,6 +44,51 @@ def _to_summary(u: User) -> AdminUserOut:
         is_active=u.is_active,
         created_at=u.created_at,
     )
+
+
+@router.post("", response_model=AdminUserOut, status_code=status.HTTP_201_CREATED)
+def create_customer(
+    payload: AdminCreateCustomerRequest,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Enroll a new Savomart customer. Since self-signup is disabled,
+    this is the only way new customers enter the system."""
+    existing = db.query(User).filter(User.mobile_number == payload.mobile_number).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"A customer is already registered with +91 {payload.mobile_number}.",
+        )
+
+    # Derive tier from points if not explicitly chosen
+    from loyalty import tier_for_balance
+    tier = Tier(payload.tier) if payload.tier else tier_for_balance(payload.initial_points)
+
+    user = User(
+        name=payload.name,
+        mobile_number=payload.mobile_number,
+        points_balance=payload.initial_points,
+        tier=tier,
+        is_active=True,
+    )
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Couldn't enroll the customer.") from exc
+
+    audit_log(
+        db, admin, "user.create",
+        target_type="user", target_id=user.id,
+        details={
+            "name": user.name, "mobile": user.mobile_number,
+            "initial_points": user.points_balance, "tier": user.tier.value,
+        },
+    )
+    return _to_summary(user)
 
 
 @router.get("", response_model=list[AdminUserOut])
