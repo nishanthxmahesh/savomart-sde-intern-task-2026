@@ -9,9 +9,9 @@ A customer-facing loyalty companion for Savomart shoppers — points, offers, st
 | | |
 |---|---|
 | **Author** | Nishanth Mahesh |
-| **Live frontend (Vercel)** | _TODO_FRONTEND_URL_ |
-| **Live backend (Render)** | _TODO_BACKEND_URL_ |
-| **Video demo (Google Drive)** | _TODO_DRIVE_URL_ |
+| **Live frontend (Vercel)** | <https://savomart-loyalty.vercel.app/> |
+| **Live backend (Render)** | <https://savomart-api-q4vb.onrender.com> |
+| **Video demo (Google Drive)** | _To be added — see commit history for updated link_ |
 | **Repository** | <https://github.com/nishanthxmahesh/savomart-sde-intern-task-2026> |
 
 > **Heads-up on the deployed demo:** Render's free tier sleeps after 15 min idle — the first request takes ~30s to wake the backend. After that it's snappy.
@@ -315,7 +315,7 @@ savomart-sde-intern-task-2026/
 ## Submission metadata (for the reviewer's convenience)
 
 - **Author:** Nishanth Mahesh
-- **Live frontend (Vercel):** _TODO_FRONTEND_URL_
-- **Live backend (Render):** _TODO_BACKEND_URL_
-- **Video demo (Google Drive):** _TODO_DRIVE_URL_
+- **Live frontend (Vercel):** <https://savomart-loyalty.vercel.app/>
+- **Live backend (Render):** <https://savomart-api-q4vb.onrender.com>
+- **Video demo (Google Drive):** _To be added — see commit history for updated link_
 - **Repository:** <https://github.com/nishanthxmahesh/savomart-sde-intern-task-2026>

@@ -50,9 +50,9 @@ export default function Dashboard() {
       <AppHeader />
 
       <main className="max-w-5xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-24 lg:pb-10">
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left / main column */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6 min-w-0">
             {/* Greeting */}
             <div className="flex items-start justify-between gap-3 animate-fade-in">
               <div className="min-w-0 flex-1">
@@ -140,7 +140,7 @@ export default function Dashboard() {
                   to earn new ones.
                 </div>
               ) : (
-                <div className="flex gap-3 overflow-x-auto savo-scroll-x pb-2 -mx-4 px-4 snap-x snap-mandatory">
+                <div className="flex gap-3 overflow-x-auto savo-scroll-x pb-2 -mx-3 sm:-mx-4 px-3 sm:px-4 snap-x snap-mandatory">
                   {coupons.map((c) => (
                     <div key={c.id} className="snap-start">
                       <CouponCard coupon={c} />
@@ -152,7 +152,7 @@ export default function Dashboard() {
           </div>
 
           {/* Right column (transactions + profile sidebar on desktop) */}
-          <aside className="space-y-6">
+          <aside className="space-y-4 sm:space-y-6 min-w-0">
             <section className="savo-card p-4 sm:p-5">
               <div className="flex items-center justify-between mb-3">
                 <div>
