@@ -2,7 +2,7 @@
 
 A customer-facing loyalty companion for Savomart shoppers — points, offers, store discovery, and support in one place. Built as the SDE Intern take-home challenge.
 
-> **Status:** Complete + AI chat-agent bonus shipped. Deployment is the only remaining piece.
+> **Status:** Complete. All six core requirements + the AI chat-agent bonus + deploy configs + a full **admin panel** (separate auth namespace, 7 ops sections, role-based access, audit log).
 
 ## Quick start
 
@@ -30,6 +30,29 @@ npm run dev
 ```
 
 Frontend is at `http://localhost:5173`.
+
+## Admin panel (`/admin`)
+
+A separate ops console for the loyalty team. **Different auth namespace** from the customer app — admin tokens use a separate JWT secret (`ADMIN_JWT_SECRET`) and shorter 8-hour expiry, so a leaked customer token can never authenticate `/api/admin/*` (and vice versa — verified with curl).
+
+**Open `http://localhost:5173/admin/login` and use:**
+
+| Email                                 | Password    | Role          | Scope                     |
+| ------------------------------------- | ----------- | ------------- | ------------------------- |
+| `admin@savomart.in`                   | `Admin@123` | superadmin    | Everything                |
+| `manager.indiranagar@savomart.in`     | `Store@123` | store_manager | Indiranagar store + sitewide read-only |
+
+### What's inside
+- **Dashboard** — 4 stat cards (total customers, points issued, active offers, open tickets) + recent signups + recent tickets tables
+- **Offers** — full CRUD with status pills (Active/Scheduled/Expired), duplicate, delete. Modal covers every field including `tier_required`. Store managers can only mutate offers tied to their store.
+- **Coupons** (superadmin) — filter pills, issue single coupon with live customer search, **bulk-issue from a comma/newline mobile list** (returns issued count + missing mobiles report)
+- **Points** (superadmin) — adjust with mandatory reason (logged in audit trail, attributed to admin email), bulk adjust via `mobile,delta,reason` CSV, full ledger with source filter chips
+- **Tickets** — list with status/category filters, role-scoped (managers see only their assigned tickets). Detail page shows full description, parsed chat transcript (strips `<ticket_ready>` JSON tail), customer profile sidebar, status dropdown + internal notes + response_sent fields. Re-assignment is superadmin-only.
+- **Users** — debounced search by name/mobile, full detail view (transactions + active coupons + tickets), tier change (superadmin, reason required), deactivate/reactivate (deactivated users get 403 on customer login)
+- **Analytics** — 5 recharts visualisations: points issued vs redeemed (bar), tier distribution (pie with brand colours), top offer categories (horizontal bar), ticket volume by category (bar), signups last 30 days (line)
+
+### Audit log
+Every mutating admin action writes a row to `admin_audit_logs` (action, target_type, target_id, JSON-serialised details, timestamp, admin_id). Used for compliance + ops debugging. Read-only — never returned via API.
 
 ## Logging in (mock OTP)
 
