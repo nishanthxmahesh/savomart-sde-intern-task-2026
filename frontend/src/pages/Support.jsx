@@ -283,7 +283,7 @@ export default function Support() {
     <div className="min-h-full bg-savo-mist">
       <AppHeader />
 
-      <main className="max-w-3xl mx-auto px-4 pt-6 pb-24 lg:pb-10">
+      <main className="max-w-3xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-24 lg:pb-10">
         <div className="mb-4">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-savo-ink">Help & support</h1>
           <p className="text-sm text-savo-ink/60 mt-0.5">

@@ -4,7 +4,29 @@ import Logo from '../components/Logo';
 import { adminLogin, adminErrorMessage } from '../api/admin';
 import { useAdminAuth } from '../hooks/useAdminAuth';
 
-const isDev = import.meta.env.DEV;
+function DemoCredentialRow({ label, email, password, accent, onFill }) {
+  const badgeClass = accent === 'purple'
+    ? 'bg-savo-yellow-soft text-amber-900'
+    : 'bg-sky-100 text-sky-800';
+  return (
+    <button
+      type="button"
+      onClick={() => onFill(email, password)}
+      className="w-full text-left rounded-xl border border-savo-purple-100 bg-white hover:bg-savo-purple-50 active:bg-savo-purple-50 transition px-3 py-2.5 group"
+    >
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${badgeClass}`}>
+          {label}
+        </span>
+        <span className="text-[10px] text-savo-ink/45 font-semibold group-hover:text-savo-purple">
+          Tap to fill →
+        </span>
+      </div>
+      <p className="font-mono text-xs text-savo-ink truncate">{email}</p>
+      <p className="font-mono text-xs text-savo-ink/60">password: <span className="text-savo-ink">{password}</span></p>
+    </button>
+  );
+}
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -116,15 +138,28 @@ export default function AdminLogin() {
             )}
           </button>
 
-          {isDev && (
-            <div className="border-t border-savo-purple-100/60 pt-4 mt-2 text-xs text-savo-ink/55">
-              <p className="font-semibold text-savo-ink/70 mb-1">Demo accounts</p>
-              <ul className="space-y-0.5 font-mono">
-                <li>admin@savomart.in / Admin@123 (superadmin)</li>
-                <li>manager.indiranagar@savomart.in / Store@123 (store mgr)</li>
-              </ul>
+          <div className="border-t border-savo-purple-100/60 pt-4 mt-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-savo-purple mb-2">Demo accounts</p>
+            <div className="space-y-2">
+              <DemoCredentialRow
+                label="Superadmin"
+                email="admin@savomart.in"
+                password="Admin@123"
+                accent="purple"
+                onFill={(em, pw) => { setEmail(em); setPassword(pw); setError(''); }}
+              />
+              <DemoCredentialRow
+                label="Store manager"
+                email="manager.indiranagar@savomart.in"
+                password="Store@123"
+                accent="sky"
+                onFill={(em, pw) => { setEmail(em); setPassword(pw); setError(''); }}
+              />
             </div>
-          )}
+            <p className="text-[10px] text-savo-ink/45 mt-2 leading-relaxed">
+              Tap a row to auto-fill. Demo creds shown for take-home review only.
+            </p>
+          </div>
         </form>
 
         <p className="text-center text-xs text-white/50 mt-6">

@@ -63,7 +63,7 @@ export default function Offers() {
     <div className="min-h-full bg-savo-mist">
       <AppHeader />
 
-      <main className="max-w-5xl mx-auto px-4 pt-6 pb-24 lg:pb-10">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-24 lg:pb-10">
         <div className="flex items-end justify-between gap-3 mb-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-savo-ink">Offers</h1>

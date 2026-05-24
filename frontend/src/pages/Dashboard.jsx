@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAsync } from '../hooks/useAsync';
 import { fetchCoupons, fetchProfile, fetchTransactions } from '../api/profile';
@@ -27,11 +28,20 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const profileQ = useAsync(fetchProfile);
   const couponsQ = useAsync(fetchCoupons);
-  const txnsQ = useAsync(() => fetchTransactions(8));
+  const [showAllTxns, setShowAllTxns] = useState(false);
+  const txnsQ = useAsync(() => fetchTransactions(showAllTxns ? 50 : 8), [showAllTxns]);
+  const [expandedTxnId, setExpandedTxnId] = useState(null);
 
   const profile = profileQ.data;
   const coupons = couponsQ.data || [];
   const txns = txnsQ.data || [];
+
+  const earnedTotal = txns
+    .filter((t) => t.delta > 0)
+    .reduce((sum, t) => sum + t.delta, 0);
+  const spentTotal = txns
+    .filter((t) => t.delta < 0)
+    .reduce((sum, t) => sum + Math.abs(t.delta), 0);
 
   const firstName = (profile?.name || '').split(' ')[0] || 'there';
 
@@ -39,21 +49,21 @@ export default function Dashboard() {
     <div className="min-h-full bg-savo-mist">
       <AppHeader />
 
-      <main className="max-w-5xl mx-auto px-4 pt-6 pb-24 lg:pb-10">
+      <main className="max-w-5xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-24 lg:pb-10">
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left / main column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Greeting */}
-            <div className="flex items-center justify-between gap-3 animate-fade-in">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-savo-ink">
+            <div className="flex items-start justify-between gap-3 animate-fade-in">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-savo-ink truncate">
                   Hi {firstName} <span className="inline-block">👋</span>
                 </h1>
-                <p className="text-sm text-savo-ink/60 mt-0.5">
+                <p className="text-xs sm:text-sm text-savo-ink/60 mt-0.5">
                   Welcome back. Here's your loyalty snapshot.
                 </p>
               </div>
-              {profile && <TierBadge tier={profile.tier} />}
+              {profile && <div className="shrink-0"><TierBadge tier={profile.tier} /></div>}
             </div>
 
             {/* Points card */}
@@ -143,15 +153,51 @@ export default function Dashboard() {
 
           {/* Right column (transactions + profile sidebar on desktop) */}
           <aside className="space-y-6">
-            <section className="savo-card p-5">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-base font-bold text-savo-ink">Recent activity</h2>
+            <section className="savo-card p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-lg font-bold text-savo-ink">Recent activity</h2>
+                  <p className="text-[11px] text-savo-ink/50 mt-0.5">Tap any row for full details</p>
+                </div>
+                {txns.length > 0 && (
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-wider font-bold text-savo-ink/45">Last {txns.length}</p>
+                    <p className="text-xs font-bold tabular-nums">
+                      <span className="text-emerald-600">+{earnedTotal.toLocaleString('en-IN')}</span>
+                      {spentTotal > 0 && (
+                        <>
+                          <span className="text-savo-ink/30 mx-1">·</span>
+                          <span className="text-red-600">−{spentTotal.toLocaleString('en-IN')}</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
+
+              {/* Stat strip — earned vs redeemed */}
+              {!txnsQ.loading && txns.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80">Earned</p>
+                    <p className="text-base font-extrabold tabular-nums text-emerald-700">
+                      +{earnedTotal.toLocaleString('en-IN')}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-red-100 bg-red-50/70 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-red-700/80">Redeemed</p>
+                    <p className="text-base font-extrabold tabular-nums text-red-700">
+                      {spentTotal === 0 ? '—' : `−${spentTotal.toLocaleString('en-IN')}`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {txnsQ.loading ? (
-                <div className="space-y-3 mt-3">
-                  {[0, 1, 2, 3].map((i) => (
+                <div className="space-y-3 mt-2">
+                  {[0, 1, 2, 3, 4].map((i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <SkeletonBlock className="w-9 h-9 rounded-full" />
+                      <SkeletonBlock className="w-10 h-10 rounded-full" />
                       <div className="flex-1 space-y-1.5">
                         <SkeletonText width="w-3/4" />
                         <SkeletonText width="w-1/3" />
@@ -160,13 +206,38 @@ export default function Dashboard() {
                   ))}
                 </div>
               ) : txns.length === 0 ? (
-                <p className="text-sm text-savo-ink/60 mt-2">No activity yet.</p>
+                <p className="text-sm text-savo-ink/60 mt-2">No activity yet — start shopping at any Savomart store.</p>
               ) : (
-                <ul className="mt-1">
-                  {txns.map((t) => (
-                    <TransactionRow key={t.id} txn={t} />
-                  ))}
-                </ul>
+                <>
+                  <ul className="-mt-1">
+                    {txns.map((t) => (
+                      <TransactionRow
+                        key={t.id}
+                        txn={t}
+                        expanded={expandedTxnId === t.id}
+                        onToggle={() => setExpandedTxnId((cur) => (cur === t.id ? null : t.id))}
+                      />
+                    ))}
+                  </ul>
+                  {!showAllTxns && txns.length >= 8 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllTxns(true)}
+                      className="mt-3 w-full text-center text-xs font-bold text-savo-purple hover:bg-savo-purple-50 py-2 rounded-lg transition"
+                    >
+                      Show full history →
+                    </button>
+                  )}
+                  {showAllTxns && (
+                    <button
+                      type="button"
+                      onClick={() => { setShowAllTxns(false); setExpandedTxnId(null); }}
+                      className="mt-3 w-full text-center text-xs font-bold text-savo-ink/60 hover:bg-slate-50 py-2 rounded-lg transition"
+                    >
+                      Collapse
+                    </button>
+                  )}
+                </>
               )}
             </section>
 

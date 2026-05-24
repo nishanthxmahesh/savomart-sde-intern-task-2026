@@ -69,7 +69,7 @@ export default function Stores() {
     <div className="min-h-full bg-savo-mist flex flex-col">
       <AppHeader />
 
-      <main className="max-w-6xl w-full mx-auto px-4 pt-6 pb-24 lg:pb-10 flex-1 flex flex-col min-h-0">
+      <main className="max-w-6xl w-full mx-auto px-3 sm:px-4 pt-4 sm:pt-6 pb-24 lg:pb-10 flex-1 flex flex-col min-h-0">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-savo-ink">Find a store</h1>

@@ -5,7 +5,7 @@ export default function PointsCard({ balance, tier, nextTier, pointsToNext, prog
   const isMaxTier = !nextTier;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-savo-purple text-white shadow-savo-glow p-6">
+    <div className="relative overflow-hidden rounded-3xl bg-savo-purple text-white shadow-savo-glow p-5 sm:p-6">
       <div
         className="absolute -right-12 -top-12 w-48 h-48 rounded-full bg-savo-yellow/10 blur-2xl pointer-events-none"
         aria-hidden
@@ -22,8 +22,8 @@ export default function PointsCard({ balance, tier, nextTier, pointsToNext, prog
           <p className="text-white/60 text-xs font-medium">{tier} member</p>
         </div>
 
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-5xl font-extrabold text-savo-yellow tabular-nums leading-none">
+        <div className="mt-3 flex items-baseline gap-2 flex-wrap">
+          <span className="text-4xl sm:text-5xl font-extrabold text-savo-yellow tabular-nums leading-none">
             {displayed.toLocaleString('en-IN')}
           </span>
           <span className="text-white/70 font-semibold text-sm">pts</span>
