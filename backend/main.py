@@ -64,6 +64,10 @@ def _build_cors_origins() -> list[str]:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_build_cors_origins(),
+    # Any Vercel deployment (preview + prod) is allowed by default — saves
+    # the reviewer from having to set FRONTEND_URL manually on Render for
+    # the take-home demo. Tighten this if you fork for real production.
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

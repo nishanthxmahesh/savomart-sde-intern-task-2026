@@ -242,20 +242,30 @@ export default function Dashboard() {
             </section>
 
             {profile && (
-              <section className="savo-card p-5">
+              <section className="savo-card p-4 sm:p-5">
                 <h2 className="text-base font-bold text-savo-ink mb-3">Profile</h2>
                 <dl className="text-sm space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <dt className="text-savo-ink/55">Name</dt>
-                    <dd className="font-semibold">{profile.name}</dd>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-savo-ink/55 shrink-0">Name</dt>
+                    <dd className="font-semibold truncate text-right">{profile.name}</dd>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="text-savo-ink/55">Mobile</dt>
-                    <dd className="font-mono">+91 {profile.mobile_number}</dd>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-savo-ink/55 shrink-0">Mobile</dt>
+                    <dd className="font-mono text-right">+91 {profile.mobile_number}</dd>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <dt className="text-savo-ink/55">Member since</dt>
-                    <dd className="font-semibold">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-savo-ink/55 shrink-0">Tier</dt>
+                    <dd>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                        profile.tier === 'Gold' ? 'bg-savo-yellow-soft text-amber-900' :
+                        profile.tier === 'Silver' ? 'bg-slate-100 text-slate-700' :
+                        'bg-amber-100 text-amber-900'
+                      }`}>{profile.tier}</span>
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-savo-ink/55 shrink-0">Member since</dt>
+                    <dd className="font-semibold text-right">
                       {new Date(profile.member_since).toLocaleDateString('en-IN', {
                         month: 'short',
                         year: 'numeric',

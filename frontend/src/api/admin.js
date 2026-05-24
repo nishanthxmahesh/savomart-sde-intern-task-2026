@@ -180,9 +180,10 @@ export async function reactivateUser(userId) {
 export async function importCustomersExcel(file) {
   const form = new FormData();
   form.append('file', file);
+  // Don't set Content-Type manually — the browser must add the boundary
+  // param automatically (e.g. multipart/form-data; boundary=----WebKit...).
   const { data } = await adminApi.post('/api/admin/users/import-excel', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 60000,
+    timeout: 90000,
   });
   return data;
 }
