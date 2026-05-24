@@ -47,6 +47,18 @@ class TicketSource(str, enum.Enum):
     CHAT = "chat"
 
 
+class AdminRole(str, enum.Enum):
+    SUPERADMIN = "superadmin"
+    STORE_MANAGER = "store_manager"
+
+
+class PointsSource(str, enum.Enum):
+    PURCHASE = "purchase"
+    REDEMPTION = "redemption"
+    ADMIN_ADJUSTMENT = "admin_adjustment"
+    BONUS = "bonus"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -55,6 +67,7 @@ class User(Base):
     mobile_number = Column(String(20), unique=True, nullable=False, index=True)
     points_balance = Column(Integer, nullable=False, default=0)
     tier = Column(Enum(Tier), nullable=False, default=Tier.BRONZE)
+    is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
 
     transactions = relationship("PointsTransaction", back_populates="user", cascade="all, delete-orphan")
@@ -80,7 +93,9 @@ class PointsTransaction(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     delta = Column(Integer, nullable=False)
     description = Column(String(255), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    source = Column(Enum(PointsSource), nullable=False, default=PointsSource.PURCHASE)
+    admin_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
 
     user = relationship("User", back_populates="transactions")
 
@@ -131,6 +146,42 @@ class SupportTicket(Base):
     status = Column(Enum(TicketStatus), nullable=False, default=TicketStatus.OPEN)
     source = Column(Enum(TicketSource), nullable=False, default=TicketSource.FORM)
     chat_transcript = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+    # Admin fields — never returned to the customer
+    assigned_to_admin_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
+    internal_notes = Column(Text, nullable=True)
+    response_sent = Column(Text, nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
 
     user = relationship("User", back_populates="tickets")
+    assigned_admin = relationship("AdminUser", foreign_keys=[assigned_to_admin_id])
+
+
+class AdminUser(Base):
+    __tablename__ = "admin_users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(160), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(120), nullable=False, default="")
+    role = Column(Enum(AdminRole), nullable=False, default=AdminRole.STORE_MANAGER)
+    # For store_manager — string store id matching the live/fallback store ids
+    # (e.g. "indiranagar"). Null for superadmin (sees everything).
+    store_id = Column(String(64), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False, index=True)
+    action = Column(String(60), nullable=False, index=True)   # e.g. "offer.create"
+    target_type = Column(String(40), nullable=True)            # e.g. "offer", "user"
+    target_id = Column(String(64), nullable=True)              # e.g. "42" or "SAVO-XX"
+    details = Column(Text, nullable=True)                      # JSON-encoded summary
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+
+    admin = relationship("AdminUser")

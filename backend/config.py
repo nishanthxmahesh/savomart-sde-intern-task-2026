@@ -6,6 +6,18 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 7
 
+    # Admin JWT uses a separate secret + shorter expiry so that even if a
+    # customer JWT is leaked, it can never authenticate admin endpoints.
+    admin_jwt_secret: str = "dev-admin-secret-change-me-too"
+    admin_jwt_expire_hours: int = 8
+
+    # Seeded admin accounts (overrideable via env for production)
+    admin_superadmin_email: str = "admin@savomart.in"
+    admin_superadmin_password: str = "Admin@123"
+    admin_store_manager_email: str = "manager.indiranagar@savomart.in"
+    admin_store_manager_password: str = "Store@123"
+    admin_store_manager_store_id: str = "indiranagar"
+
     otp_expire_seconds: int = 300
 
     stores_api_url: str = "https://internal-service.savomart.in/bridge/api/store/list?is_operational=True"

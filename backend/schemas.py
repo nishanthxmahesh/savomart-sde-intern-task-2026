@@ -210,6 +210,255 @@ class ChatResponse(BaseModel):
     model: str
 
 
+# ============================================================
+# ADMIN
+# ============================================================
+
+class AdminLoginRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=160)
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+class AdminSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    name: str
+    role: str
+    store_id: Optional[str]
+
+
+class AdminLoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in_hours: int
+    admin: AdminSummary
+
+
+# --- Dashboard ---
+
+class AdminDashboardSignup(BaseModel):
+    id: int
+    name: str
+    mobile_number: str
+    tier: str
+    created_at: datetime
+    points_balance: int
+
+
+class AdminDashboardTicket(BaseModel):
+    public_id: str
+    customer_name: str
+    customer_mobile: str
+    category: str
+    status: str
+    source: str
+    created_at: datetime
+
+
+class AdminDashboardResponse(BaseModel):
+    total_customers: int
+    total_points_issued: int
+    active_offers: int
+    open_tickets: int
+    recent_signups: list[AdminDashboardSignup]
+    recent_tickets: list[AdminDashboardTicket]
+
+
+# --- Offers (admin) ---
+
+class AdminOfferIn(BaseModel):
+    title: str = Field(..., min_length=3, max_length=160)
+    description: str = Field(..., min_length=3, max_length=2000)
+    discount_label: str = Field(..., min_length=1, max_length=40)
+    category: str = Field(..., min_length=1, max_length=60)
+    valid_from: datetime
+    valid_until: datetime
+    store_scope: str = Field(..., pattern="^(all|specific)$")
+    store_id: Optional[str] = None
+    store_name: Optional[str] = None
+    tier_required: Optional[str] = Field(default=None, pattern="^(Bronze|Silver|Gold)$")
+
+    @field_validator("title", "description", "discount_label", "category")
+    @classmethod
+    def trim(cls, v: str) -> str:
+        return v.strip()
+
+
+class AdminOfferOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    description: str
+    discount_label: str
+    category: str
+    valid_from: datetime
+    valid_until: datetime
+    store_scope: str
+    store_id: Optional[str]
+    store_name: Optional[str]
+    tier_required: Optional[str]
+    created_at: datetime
+
+
+# --- Coupons (admin) ---
+
+class AdminIssueCouponRequest(BaseModel):
+    user_id: int
+    code: Optional[str] = Field(default=None, max_length=40)
+    discount_value: int = Field(..., ge=1, le=10000)
+    discount_type: str = Field(..., pattern="^(percent|flat)$")
+    description: str = Field(..., min_length=3, max_length=255)
+    expires_in_days: int = Field(default=30, ge=1, le=365)
+    applicable_store_id: Optional[str] = None
+
+
+class AdminBulkCouponRequest(BaseModel):
+    mobile_numbers: list[str] = Field(..., min_length=1, max_length=1000)
+    code_prefix: str = Field(default="BULK", max_length=20)
+    discount_value: int = Field(..., ge=1, le=10000)
+    discount_type: str = Field(..., pattern="^(percent|flat)$")
+    description: str = Field(..., min_length=3, max_length=255)
+    expires_in_days: int = Field(default=30, ge=1, le=365)
+    applicable_store_id: Optional[str] = None
+
+
+class AdminCouponOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    customer_name: str
+    customer_mobile: str
+    code: str
+    discount_value: int
+    discount_type: str
+    description: str
+    expires_at: datetime
+    is_used: bool
+    applicable_store_id: Optional[str]
+    created_at: datetime
+
+
+# --- Points (admin) ---
+
+class AdminPointsAdjustRequest(BaseModel):
+    user_id: int
+    delta: int = Field(..., description="Positive to add, negative to deduct")
+    reason: str = Field(..., min_length=5, max_length=255)
+
+    @field_validator("delta")
+    @classmethod
+    def nonzero(cls, v: int) -> int:
+        if v == 0:
+            raise ValueError("delta must be non-zero")
+        return v
+
+
+class AdminPointsBulkEntry(BaseModel):
+    mobile_number: str = Field(..., min_length=10, max_length=15)
+    delta: int
+    reason: str = Field(..., min_length=5, max_length=255)
+
+
+class AdminPointsBulkRequest(BaseModel):
+    entries: list[AdminPointsBulkEntry] = Field(..., min_length=1, max_length=500)
+
+
+class AdminPointsLedgerEntry(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    customer_name: str
+    customer_mobile: str
+    delta: int
+    description: str
+    source: str
+    admin_email: Optional[str]
+    created_at: datetime
+
+
+# --- Tickets (admin) ---
+
+class AdminTicketOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    public_id: str
+    user_id: int
+    customer_name: str
+    customer_mobile: str
+    customer_tier: str
+    customer_points: int
+    category: str
+    subject: str
+    description: str
+    status: str
+    source: str
+    chat_transcript: Optional[str]
+    assigned_to_admin_id: Optional[int]
+    assigned_to_admin_email: Optional[str]
+    internal_notes: Optional[str]
+    response_sent: Optional[str]
+    resolved_at: Optional[datetime]
+    created_at: datetime
+
+
+class AdminTicketUpdate(BaseModel):
+    status: Optional[str] = Field(default=None, pattern="^(open|in-progress|resolved)$")
+    internal_notes: Optional[str] = Field(default=None, max_length=4000)
+    response_sent: Optional[str] = Field(default=None, max_length=4000)
+    assigned_to_admin_id: Optional[int] = None
+
+
+# --- Users (admin) ---
+
+class AdminUserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    mobile_number: str
+    points_balance: int
+    tier: str
+    is_active: bool
+    created_at: datetime
+
+
+class AdminUserDetail(AdminUserOut):
+    transactions: list[TransactionResponse]
+    coupons: list[CouponResponse]
+    tickets: list[AdminTicketOut]
+
+
+class AdminUserTierChange(BaseModel):
+    tier: str = Field(..., pattern="^(Bronze|Silver|Gold)$")
+    reason: str = Field(..., min_length=5, max_length=255)
+
+
+# --- Analytics ---
+
+class AnalyticsBar(BaseModel):
+    label: str
+    value: int
+
+
+class AnalyticsTimeseriesPoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    value: int
+
+
+class AdminAnalyticsResponse(BaseModel):
+    points_issued_vs_redeemed: list[AnalyticsBar]  # 2 entries
+    tier_distribution: list[AnalyticsBar]          # 3 entries
+    top_offer_categories: list[AnalyticsBar]
+    ticket_volume_by_category: list[AnalyticsBar]
+    signups_last_30_days: list[AnalyticsTimeseriesPoint]
+
+
 class TicketResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

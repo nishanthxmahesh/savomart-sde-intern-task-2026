@@ -6,7 +6,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from routers import auth, offers, profile, stores, support
+from routers import (
+    admin_analytics,
+    admin_auth,
+    admin_coupons,
+    admin_dashboard,
+    admin_offers,
+    admin_points,
+    admin_tickets,
+    admin_users,
+    auth,
+    offers,
+    profile,
+    stores,
+    support,
+)
 from seed import run_seed
 
 
@@ -75,3 +89,13 @@ app.include_router(profile.router)
 app.include_router(offers.router)
 app.include_router(stores.router)
 app.include_router(support.router)
+
+# Admin (separate auth namespace — see admin_security.py)
+app.include_router(admin_auth.router)
+app.include_router(admin_dashboard.router)
+app.include_router(admin_offers.router)
+app.include_router(admin_coupons.router)
+app.include_router(admin_points.router)
+app.include_router(admin_tickets.router)
+app.include_router(admin_users.router)
+app.include_router(admin_analytics.router)

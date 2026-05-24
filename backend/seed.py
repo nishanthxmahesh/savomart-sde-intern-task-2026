@@ -6,8 +6,12 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from admin_security import hash_password
+from config import settings
 from database import SessionLocal, engine, Base
 from models import (
+    AdminRole,
+    AdminUser,
     Coupon,
     DiscountType,
     Offer,
@@ -24,6 +28,31 @@ log = logging.getLogger("savomart.seed")
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _ensure_admin(
+    db: Session,
+    email: str,
+    name: str,
+    plain_password: str,
+    role: AdminRole,
+    store_id: str | None = None,
+) -> AdminUser:
+    email_norm = email.strip().lower()
+    admin = db.query(AdminUser).filter(AdminUser.email == email_norm).first()
+    if admin:
+        return admin
+    admin = AdminUser(
+        email=email_norm,
+        name=name,
+        password_hash=hash_password(plain_password),
+        role=role,
+        store_id=store_id,
+        is_active=True,
+    )
+    db.add(admin)
+    db.flush()
+    return admin
 
 
 def _ensure_user(db: Session, mobile: str, name: str, points: int, tier: Tier) -> User:
@@ -289,6 +318,7 @@ def run_seed() -> None:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
+        # --- Customers ---
         gold = _ensure_user(db, "9999999999", "Aanya Sharma", 5400, Tier.GOLD)
         silver = _ensure_user(db, "8888888888", "Rahul Mehta", 2750, Tier.SILVER)
         bronze = _ensure_user(db, "7777777777", "Priya Iyer", 420, Tier.BRONZE)
@@ -304,9 +334,32 @@ def run_seed() -> None:
 
         _seed_offers(db)
 
+        # --- Admins (separate auth namespace) ---
+        _ensure_admin(
+            db,
+            email=settings.admin_superadmin_email,
+            name="Savomart Superadmin",
+            plain_password=settings.admin_superadmin_password,
+            role=AdminRole.SUPERADMIN,
+            store_id=None,
+        )
+        _ensure_admin(
+            db,
+            email=settings.admin_store_manager_email,
+            name="Indiranagar Manager",
+            plain_password=settings.admin_store_manager_password,
+            role=AdminRole.STORE_MANAGER,
+            store_id=settings.admin_store_manager_store_id,
+        )
+
         db.commit()
         offer_count = db.query(Offer).count()
-        log.info("demo data ready: 3 users, coupons, transactions, %d offers", offer_count)
+        admin_count = db.query(AdminUser).count()
+        log.info(
+            "demo data ready: 3 customers + %d admins + coupons + transactions + %d offers",
+            admin_count,
+            offer_count,
+        )
     finally:
         db.close()
 
