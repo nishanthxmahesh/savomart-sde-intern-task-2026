@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-# ---------- Auth (Firebase Phone) ----------
+# ---------- Auth (mock OTP) ----------
 
 
 def _clean_mobile_value(v: str) -> str:
@@ -17,8 +17,7 @@ def _clean_mobile_value(v: str) -> str:
     return v
 
 
-class VerifyFirebaseTokenRequest(BaseModel):
-    firebase_token: str = Field(..., min_length=20, max_length=4096)
+class SendOTPRequest(BaseModel):
     mobile_number: str = Field(..., min_length=10, max_length=15)
 
     @field_validator("mobile_number")
@@ -32,6 +31,29 @@ class VerifyFirebaseTokenRequest(BaseModel):
         return cleaned
 
 
+class SendOTPResponse(BaseModel):
+    message: str
+    expires_in: int
+    dev_otp: Optional[str] = None
+
+
+class VerifyOTPRequest(BaseModel):
+    mobile_number: str = Field(..., min_length=10, max_length=15)
+    otp: str = Field(..., min_length=6, max_length=6)
+
+    @field_validator("mobile_number")
+    @classmethod
+    def clean_mobile(cls, v: str) -> str:
+        return _clean_mobile_value(v)
+
+    @field_validator("otp")
+    @classmethod
+    def otp_digits(cls, v: str) -> str:
+        if not v.isdigit():
+            raise ValueError("otp must be 6 digits")
+        return v
+
+
 class UserSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,15 +64,10 @@ class UserSummary(BaseModel):
     tier: str
 
 
-class VerifyFirebaseTokenResponse(BaseModel):
+class VerifyOTPResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    customer: UserSummary
-
-
-class NotEnrolledResponse(BaseModel):
-    enrolled: bool = False
-    message: str
+    user: UserSummary
 
 
 # ---------- Profile ----------
@@ -444,6 +461,29 @@ class AdminUserDetail(AdminUserOut):
 class AdminUserTierChange(BaseModel):
     tier: str = Field(..., pattern="^(Bronze|Silver|Gold)$")
     reason: str = Field(..., min_length=5, max_length=255)
+
+
+class ImportRowOutcome(BaseModel):
+    row: int
+    mobile: str
+    name: str
+    points_awarded: int = 0
+    coupon_redeemed: Optional[str] = None
+    created: bool = False
+    error: Optional[str] = None
+
+
+class ImportExcelResponse(BaseModel):
+    total_rows: int
+    created_users: int
+    updated_users: int
+    points_awarded_total: int
+    coupons_redeemed_total: int
+    success_count: int
+    error_count: int
+    outcomes: list[ImportRowOutcome]
+    errors: list[ImportRowOutcome]
+    header_errors: list[str] = []
 
 
 # --- Analytics ---

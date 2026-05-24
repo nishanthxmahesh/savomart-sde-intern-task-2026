@@ -18,10 +18,6 @@ services:
         value: https://internal-service.savomart.in/bridge/api/store/list?is_operational=True
       - key: FRONTEND_URL
         sync: false
-      # Firebase Admin service-account JSON, minified to a single line.
-      # See DEPLOY.md for how to generate + paste this.
-      - key: FIREBASE_SERVICE_ACCOUNT_JSON
-        sync: false
       # Admin JWT (separate from customer JWT — never mixed)
       - key: ADMIN_JWT_SECRET
         generateValue: true

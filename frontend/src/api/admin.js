@@ -177,6 +177,31 @@ export async function reactivateUser(userId) {
   const { data } = await adminApi.patch(`/api/admin/users/${userId}/reactivate`);
   return data;
 }
+export async function importCustomersExcel(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await adminApi.post('/api/admin/users/import-excel', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
+  });
+  return data;
+}
+export async function downloadImportTemplate() {
+  const res = await adminApi.get('/api/admin/users/import-template', {
+    responseType: 'blob',
+  });
+  const blob = new Blob([res.data], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'savomart_customer_import_template.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 // -- analytics --
 export async function fetchAdminAnalytics() {

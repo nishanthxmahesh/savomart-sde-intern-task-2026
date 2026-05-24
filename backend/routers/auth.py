@@ -1,31 +1,30 @@
-"""Customer auth — Firebase Phone Authentication.
+"""Customer auth — mock OTP (no Firebase).
 
-Firebase handles the OTP delivery + verification on the client. The client
-hands us the resulting ID token; we verify it server-side, confirm the
-phone number it certifies matches the mobile the client claims, then
-issue our own application JWT.
+We generate a random 6-digit OTP on send-otp, store it in the OTPRecord
+table, and print it to the console. The same code is also returned in the
+response as `dev_otp` so the take-home reviewer can log in without needing
+backend-console access.
 
-Only registered Savomart customers can log in. A Firebase-verified
-mobile that isn't in our `users` table gets a clear enrollment message —
-admins create new accounts via the admin panel.
+This will be replaced with a real SMS provider (or Firebase Phone Auth on
+a Blaze plan) before production.
 """
 import logging
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timedelta, timezone
 
-import firebase_admin
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
-from firebase_admin import auth as firebase_auth
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-import firebase_init  # noqa: F401 — side-effect: initialize on import
+from config import settings
 from database import get_db
-from models import User
+from models import OTPRecord, User
 from schemas import (
+    SendOTPRequest,
+    SendOTPResponse,
     UserSummary,
-    VerifyFirebaseTokenRequest,
-    VerifyFirebaseTokenResponse,
+    VerifyOTPRequest,
+    VerifyOTPResponse,
 )
 from security import create_access_token
 
@@ -33,114 +32,136 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 log = logging.getLogger("savomart.auth")
 
 
-def _firebase_ready() -> bool:
-    return bool(firebase_admin._apps)
+def _generate_otp() -> str:
+    return f"{random.randint(0, 999999):06d}"
 
 
-def _normalize_phone(claim: str) -> str:
-    """Pull a 10-digit Indian mobile out of whatever Firebase returns
-    in the `phone_number` claim (e.g. '+919999999999')."""
-    v = (claim or "").strip()
-    if v.startswith("+91"):
-        v = v[3:]
-    if v.startswith("91") and len(v) == 12:
-        v = v[2:]
-    return v
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 @router.post(
-    "/verify-firebase-token",
-    response_model=VerifyFirebaseTokenResponse,
+    "/send-otp",
+    response_model=SendOTPResponse,
     responses={
-        401: {"description": "Invalid Firebase token or mobile mismatch"},
-        403: {"description": "Customer not enrolled or account deactivated"},
-        503: {"description": "Firebase admin not configured on this server"},
+        403: {"description": "Mobile not registered or account deactivated"},
     },
 )
-def verify_firebase_token(payload: VerifyFirebaseTokenRequest, db: Session = Depends(get_db)):
-    if not _firebase_ready():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Customer login is not configured on this server. "
-                "Set FIREBASE_SERVICE_ACCOUNT_JSON and restart."
-            ),
-        )
+def send_otp(payload: SendOTPRequest, db: Session = Depends(get_db)):
+    mobile = payload.mobile_number
 
-    # 1. Verify the Firebase ID token signature + expiry
-    try:
-        decoded = firebase_auth.verify_id_token(payload.firebase_token)
-    except firebase_auth.ExpiredIdTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Your verification expired. Please request a new OTP.",
-        )
-    except firebase_auth.RevokedIdTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="This sign-in was revoked. Please sign in again.",
-        )
-    except (
-        firebase_auth.InvalidIdTokenError,
-        firebase_auth.CertificateFetchError,
-        ValueError,
-    ) as exc:
-        log.warning("Firebase token verification failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid verification token.",
-        )
-
-    # 2. Confirm the phone the Firebase token certifies matches the one
-    #    the client claims. Without this an attacker who steals a Firebase
-    #    token from another mobile could try to log in as someone else.
-    fb_phone = _normalize_phone(decoded.get("phone_number", ""))
-    if not fb_phone or fb_phone != payload.mobile_number:
-        log.warning(
-            "Firebase token mobile mismatch: token=%s claimed=%s",
-            fb_phone, payload.mobile_number,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token does not match the mobile number you entered.",
-        )
-
-    # 3. Look up the customer. Only enrolled (in DB) + active customers can
-    #    log in — anyone else gets the friendly "visit any store" message.
-    user = db.query(User).filter(User.mobile_number == payload.mobile_number).first()
+    # Customer self-signup is disabled — every loyalty member is enrolled by
+    # an admin (Admin → Customers → Enroll customer or the Excel import).
+    # An unknown mobile is sent back through the front door, not auto-created.
+    user = db.query(User).filter(User.mobile_number == mobile).first()
     if user is None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            content={
+            detail={
                 "enrolled": False,
                 "message": (
-                    "This mobile is not registered with Savomart. "
-                    "Visit any store to enroll."
+                    "This mobile isn't registered with Savomart. "
+                    "Please register at any Savomart store to access loyalty."
                 ),
             },
         )
     if not user.is_active:
-        return JSONResponse(
+        raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            content={
+            detail={
                 "enrolled": True,
                 "message": "This account is deactivated. Please reach out to support.",
             },
         )
 
-    # 4. Record the login + issue our application JWT
-    user.last_login_at = datetime.now(timezone.utc)
+    try:
+        otp_code = _generate_otp()
+        expires_at = _now() + timedelta(seconds=settings.otp_expire_seconds)
+
+        db.query(OTPRecord).filter(
+            OTPRecord.mobile_number == mobile,
+            OTPRecord.is_used == False,  # noqa: E712
+        ).update({"is_used": True})
+
+        record = OTPRecord(
+            mobile_number=mobile,
+            otp_code=otp_code,
+            expires_at=expires_at,
+            is_used=False,
+        )
+        db.add(record)
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        log.exception("send_otp DB failure: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Couldn't issue an OTP right now. Please try again.",
+        ) from exc
+
+    print(
+        f"\n[SAVOMART OTP] mobile=+91{mobile}  code={otp_code}  expires_in={settings.otp_expire_seconds}s\n",
+        flush=True,
+    )
+
+    return SendOTPResponse(
+        message="OTP sent. Check your backend console (mock SMS).",
+        expires_in=settings.otp_expire_seconds,
+        dev_otp=otp_code if settings.environment != "production" else None,
+    )
+
+
+@router.post("/verify-otp", response_model=VerifyOTPResponse)
+def verify_otp(payload: VerifyOTPRequest, db: Session = Depends(get_db)):
+    mobile = payload.mobile_number
+
+    record = (
+        db.query(OTPRecord)
+        .filter(
+            OTPRecord.mobile_number == mobile,
+            OTPRecord.otp_code == payload.otp,
+            OTPRecord.is_used == False,  # noqa: E712
+        )
+        .order_by(OTPRecord.id.desc())
+        .first()
+    )
+
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OTP")
+
+    expires_at = record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at < _now():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OTP expired")
+
+    record.is_used = True
+
+    user = db.query(User).filter(User.mobile_number == mobile).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account is deactivated. Please reach out to support.",
+        )
+
+    user.last_login_at = _now()
+
     try:
         db.commit()
         db.refresh(user)
     except SQLAlchemyError as exc:
         db.rollback()
-        log.exception("verify_firebase_token DB write failed: %s", exc)
-        # Non-fatal — we can still hand back a token even if last_login update fails.
+        log.exception("verify_otp DB failure: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Login failed mid-way. Please try again.",
+        ) from exc
 
     token = create_access_token(user.id)
-    return VerifyFirebaseTokenResponse(
+    return VerifyOTPResponse(
         access_token=token,
         token_type="bearer",
-        customer=UserSummary.model_validate(user),
+        user=UserSummary.model_validate(user),
     )

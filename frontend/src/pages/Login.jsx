@@ -1,26 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { verifyFirebaseToken } from '../api/auth';
+import { sendOtp, verifyOtp } from '../api/auth';
 import { apiErrorMessage } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import { auth, isFirebaseReady, firebaseMissingVars } from '../firebase';
 import Logo from '../components/Logo';
 
 const isDev = import.meta.env.DEV;
-
-// Map Firebase auth/* error codes to user-friendly copy
-function firebaseErrorMessage(err) {
-  const code = err?.code || '';
-  if (code === 'auth/invalid-verification-code') return 'Wrong OTP. Please check the code and try again.';
-  if (code === 'auth/code-expired') return 'This OTP has expired. Tap Resend OTP to get a new one.';
-  if (code === 'auth/too-many-requests') return "You've tried too many times. Please wait a few minutes and try again.";
-  if (code === 'auth/invalid-phone-number') return 'That mobile number looks invalid.';
-  if (code === 'auth/quota-exceeded') return 'OTPs are temporarily unavailable. Please try again later.';
-  if (code === 'auth/captcha-check-failed') return "We couldn't verify you're not a bot. Refresh the page and try again.";
-  if (code === 'auth/network-request-failed') return 'Network issue while contacting Firebase. Check your connection.';
-  return err?.message || 'Something went wrong while verifying. Please try again.';
-}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -33,13 +18,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendIn, setResendIn] = useState(0);
+  const [devOtp, setDevOtp] = useState('');
   const [notEnrolledMsg, setNotEnrolledMsg] = useState('');
   const otpRefs = useRef([]);
-  const confirmationRef = useRef(null);
-  const recaptchaRef = useRef(null);
-
-  const firebaseReady = isFirebaseReady();
-  const missingVars = firebaseMissingVars();
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -54,51 +35,36 @@ export default function Login() {
     return () => clearInterval(t);
   }, [resendIn]);
 
-  // Clean up the reCAPTCHA on unmount so it doesn't persist across navigations
-  useEffect(() => {
-    return () => {
-      try { recaptchaRef.current?.clear?.(); } catch { /* noop */ }
-    };
-  }, []);
-
-  const ensureRecaptcha = () => {
-    if (recaptchaRef.current) return recaptchaRef.current;
-    // RecaptchaVerifier signature changed across firebase versions;
-    // v10+ takes (auth, containerId, params).
-    recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      size: 'invisible',
-      callback: () => { /* solved — proceed */ },
-      'expired-callback': () => {
-        setError('Verification expired. Please tap Send OTP again.');
-      },
-    });
-    return recaptchaRef.current;
-  };
-
-  const sendOtp = async () => {
+  const requestOtp = async () => {
     setError('');
-    if (!firebaseReady) {
-      setError(`Firebase is not configured. Missing env vars: ${missingVars.join(', ')}`);
-      return;
-    }
     if (mobile.length !== 10) {
       setError('Enter a valid 10-digit mobile number.');
       return;
     }
     setLoading(true);
     try {
-      const verifier = ensureRecaptcha();
-      const confirmation = await signInWithPhoneNumber(auth, `+91${mobile}`, verifier);
-      confirmationRef.current = confirmation;
+      const res = await sendOtp(mobile);
+      setDevOtp(res.dev_otp || '');
       setStep('otp');
       setResendIn(30);
       setDigits(['', '', '', '', '', '']);
       setTimeout(() => otpRefs.current[0]?.focus(), 50);
     } catch (err) {
-      // Reset the reCAPTCHA on failure so the next attempt can re-render it
-      try { recaptchaRef.current?.clear?.(); } catch { /* noop */ }
-      recaptchaRef.current = null;
-      setError(firebaseErrorMessage(err));
+      // 403 with {enrolled: false, message} → not registered
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 403 && typeof detail === 'object') {
+        if (detail.enrolled === false) {
+          setNotEnrolledMsg(
+            detail.message ||
+            "This mobile isn't registered with Savomart. Please register at any Savomart store to access loyalty.",
+          );
+          setStep('not_enrolled');
+          return;
+        }
+        setError(detail.message || 'This account cannot sign in.');
+        return;
+      }
+      setError(apiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -106,7 +72,7 @@ export default function Login() {
 
   const handleMobileSubmit = (e) => {
     e.preventDefault();
-    sendOtp();
+    requestOtp();
   };
 
   const handleOtpChange = (idx, value) => {
@@ -144,34 +110,12 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      if (!confirmationRef.current) {
-        throw new Error('Verification session expired. Please request a new OTP.');
-      }
-      // 1. Confirm OTP with Firebase
-      const credential = await confirmationRef.current.confirm(otpString);
-      const firebaseToken = await credential.user.getIdToken();
-
-      // 2. Exchange the Firebase token for our application JWT
-      try {
-        const res = await verifyFirebaseToken(firebaseToken, mobile);
-        login(res.access_token, res.customer);
-        const target = location.state?.from?.pathname || '/';
-        navigate(target, { replace: true });
-      } catch (backendErr) {
-        if (backendErr?.response?.status === 403) {
-          const data = backendErr.response.data || {};
-          if (data.enrolled === false) {
-            setNotEnrolledMsg(data.message || 'This mobile is not registered with Savomart.');
-            setStep('not_enrolled');
-            return;
-          }
-          setError(data.message || data.detail || 'This account cannot sign in.');
-          return;
-        }
-        setError(apiErrorMessage(backendErr));
-      }
+      const res = await verifyOtp(mobile, otpString);
+      login(res.access_token, res.user);
+      const target = location.state?.from?.pathname || '/';
+      navigate(target, { replace: true });
     } catch (err) {
-      setError(firebaseErrorMessage(err));
+      setError(apiErrorMessage(err));
       setDigits(['', '', '', '', '', '']);
       setTimeout(() => otpRefs.current[0]?.focus(), 50);
     } finally {
@@ -187,18 +131,22 @@ export default function Login() {
 
   const handleResend = async () => {
     if (resendIn > 0 || loading) return;
-    // Reset the reCAPTCHA so a fresh one can be solved
-    try { recaptchaRef.current?.clear?.(); } catch { /* noop */ }
-    recaptchaRef.current = null;
-    await sendOtp();
+    await requestOtp();
   };
 
   const backToMobile = () => {
     setStep('mobile');
     setError('');
     setDigits(['', '', '', '', '', '']);
+    setDevOtp('');
     setNotEnrolledMsg('');
-    confirmationRef.current = null;
+  };
+
+  const autofillOtp = () => {
+    if (!devOtp) return;
+    const next = devOtp.split('').slice(0, 6);
+    while (next.length < 6) next.push('');
+    setDigits(next);
   };
 
   return (
@@ -209,26 +157,13 @@ export default function Login() {
           <p className="mt-4 text-savo-ink/60 text-sm">Your loyalty companion for every shop.</p>
         </div>
 
-        {!firebaseReady && (
-          <div className="savo-card p-4 mb-4 border-amber-200 bg-amber-50/60">
-            <p className="text-xs font-bold uppercase tracking-wide text-amber-800 mb-1">
-              Customer login not configured
-            </p>
-            <p className="text-xs text-amber-900/80 leading-relaxed">
-              Firebase env vars are missing: <span className="font-mono">{missingVars.join(', ')}</span>.
-              See <code>DEPLOY.md</code> for setup. Admin login at{' '}
-              <a href="/admin/login" className="font-semibold underline">/admin/login</a> still works.
-            </p>
-          </div>
-        )}
-
         <div className="savo-card p-6 sm:p-8">
           {step === 'mobile' && (
             <form onSubmit={handleMobileSubmit} className="space-y-5">
               <div>
                 <h1 className="text-2xl font-bold text-savo-ink">Welcome back</h1>
                 <p className="text-sm text-savo-ink/60 mt-1">
-                  Enter your registered mobile number to continue.
+                  Enter your mobile number to continue.
                 </p>
               </div>
 
@@ -261,7 +196,7 @@ export default function Login() {
 
               <button
                 type="submit"
-                disabled={loading || mobile.length !== 10 || !firebaseReady}
+                disabled={loading || mobile.length !== 10}
                 className="savo-btn-primary w-full text-base"
               >
                 {loading ? (
@@ -272,9 +207,35 @@ export default function Login() {
               </button>
 
               <p className="text-[11px] text-savo-ink/50 text-center">
-                We'll send a one-time code to your phone via Firebase.
+                We'll generate a one-time code for this session.
               </p>
             </form>
+          )}
+
+          {step === 'not_enrolled' && (
+            <div className="text-center space-y-4">
+              <div className="mx-auto w-14 h-14 rounded-full bg-savo-yellow-soft grid place-items-center">
+                <span className="text-3xl" aria-hidden>👋</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-savo-ink">Not registered yet</h1>
+                <p className="text-sm text-savo-ink/65 mt-2 leading-relaxed">
+                  {notEnrolledMsg}
+                </p>
+                <p className="text-xs text-savo-ink/45 mt-3">
+                  +91 {mobile.slice(0, 5)} {mobile.slice(5)} isn't on file with us.
+                </p>
+              </div>
+              <div className="rounded-xl bg-savo-purple-50 border border-savo-purple-100 p-3 text-left">
+                <p className="text-xs font-bold uppercase tracking-wide text-savo-purple mb-1">How to register</p>
+                <p className="text-xs text-savo-ink/70 leading-relaxed">
+                  Drop by any Savomart store. The cashier will set up your loyalty account in under a minute — and you'll get a welcome bonus.
+                </p>
+              </div>
+              <button onClick={backToMobile} className="savo-btn-secondary w-full text-sm">
+                Try a different number
+              </button>
+            </div>
           )}
 
           {step === 'otp' && (
@@ -291,6 +252,26 @@ export default function Login() {
                   Sent to +91 {mobile.slice(0, 5)} {mobile.slice(5)}
                 </p>
               </div>
+
+              {devOtp && (
+                <div className="rounded-xl bg-savo-yellow-soft border border-amber-200 p-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-amber-800 mb-1">
+                    Demo OTP (no real SMS — Firebase Blaze upgrade coming later)
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-2xl font-mono font-bold tracking-[0.4em] text-savo-ink">
+                      {devOtp}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={autofillOtp}
+                      className="text-xs font-semibold text-savo-purple hover:underline whitespace-nowrap"
+                    >
+                      Auto-fill
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-6 gap-2 sm:gap-3" onPaste={handleOtpPaste}>
                 {digits.map((d, i) => (
@@ -331,45 +312,17 @@ export default function Login() {
               </div>
             </div>
           )}
-
-          {step === 'not_enrolled' && (
-            <div className="text-center space-y-4">
-              <div className="mx-auto w-14 h-14 rounded-full bg-savo-yellow-soft grid place-items-center">
-                <span className="text-3xl" aria-hidden>👋</span>
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-savo-ink">Not registered yet</h1>
-                <p className="text-sm text-savo-ink/65 mt-2 leading-relaxed">
-                  {notEnrolledMsg}
-                </p>
-                <p className="text-xs text-savo-ink/45 mt-3">
-                  +91 {mobile.slice(0, 5)} {mobile.slice(5)} isn't on file with us.
-                </p>
-              </div>
-              <div className="rounded-xl bg-savo-purple-50 border border-savo-purple-100 p-3 text-left">
-                <p className="text-xs font-bold uppercase tracking-wide text-savo-purple mb-1">How to enroll</p>
-                <p className="text-xs text-savo-ink/70 leading-relaxed">
-                  Drop by any Savomart store. The cashier will set up your loyalty account in under a minute — and you'll get a welcome bonus.
-                </p>
-              </div>
-              <button onClick={backToMobile} className="savo-btn-secondary w-full text-sm">
-                Try a different number
-              </button>
-            </div>
-          )}
         </div>
-
-        {/* Invisible reCAPTCHA — Firebase mounts the widget here */}
-        <div id="recaptcha-container" />
 
         <p className="text-center text-xs text-savo-ink/40 mt-6">
           © 2026 SAVOmart · An entity of Ebono Private Limited
         </p>
-        {isDev && (
-          <p className="text-center text-[10px] text-savo-ink/35 mt-1">
-            Admin? <a href="/admin/login" className="text-savo-purple font-semibold hover:underline">Sign in here</a>
-          </p>
-        )}
+        <p className="text-center text-sm text-savo-ink/60 mt-3">
+          Admin?{' '}
+          <a href="/admin/login" className="text-savo-purple font-bold hover:underline">
+            Sign in here
+          </a>
+        </p>
       </div>
     </div>
   );

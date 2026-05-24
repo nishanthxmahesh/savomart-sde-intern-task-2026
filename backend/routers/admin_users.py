@@ -1,13 +1,20 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import Response
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from admin_security import get_current_admin, require_superadmin
 from audit import audit_log
+from customer_import import (
+    EXPECTED_COLUMNS,
+    apply_rows,
+    build_template_workbook,
+    parse_workbook,
+)
 from database import get_db
 from models import (
     AdminUser,
@@ -24,10 +31,14 @@ from schemas import (
     AdminUserOut,
     AdminUserTierChange,
     CouponResponse,
+    ImportExcelResponse,
+    ImportRowOutcome,
     TransactionResponse,
 )
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
+
+MAX_IMPORT_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 def _now() -> datetime:
@@ -103,6 +114,93 @@ def list_users(
         like = f"%{q.strip()}%"
         query = query.filter(or_(User.name.ilike(like), User.mobile_number.ilike(like)))
     return [_to_summary(u) for u in query.limit(limit).all()]
+
+
+@router.get("/import-template")
+def download_import_template(_admin: AdminUser = Depends(get_current_admin)):
+    """Returns a sample .xlsx with the expected columns + 3 example rows."""
+    content = build_template_workbook()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="savomart_customer_import_template.xlsx"'
+        },
+    )
+
+
+@router.post("/import-excel", response_model=ImportExcelResponse)
+async def import_customers_excel(
+    file: UploadFile = File(...),
+    admin: AdminUser = Depends(require_superadmin),
+    db: Session = Depends(get_db),
+):
+    """Bulk-enroll customers and award loyalty points from an .xlsx.
+
+    Rules (see customer_import.py for canonical implementation):
+      - ₹10 spent = 1 point.
+      - Coupon code marks the user's matching active coupon as used.
+      - New mobile numbers create a Bronze user automatically.
+    """
+    filename = (file.filename or "").lower()
+    if not filename.endswith((".xlsx", ".xlsm")):
+        raise HTTPException(status_code=422, detail="Upload an .xlsx file.")
+
+    content = await file.read()
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="File too large (max 5 MB).")
+    if not content:
+        raise HTTPException(status_code=422, detail="The file is empty.")
+
+    rows, header_errors = parse_workbook(content)
+    if header_errors:
+        return ImportExcelResponse(
+            total_rows=0, created_users=0, updated_users=0,
+            points_awarded_total=0, coupons_redeemed_total=0,
+            success_count=0, error_count=0,
+            outcomes=[], errors=[], header_errors=header_errors,
+        )
+
+    result = apply_rows(db, rows, admin_id=admin.id)
+
+    try:
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Couldn't save imported data.") from exc
+
+    audit_log(
+        db, admin, "user.import_excel",
+        details={
+            "filename": file.filename,
+            "total_rows": result.total_rows,
+            "created_users": result.created_users,
+            "updated_users": result.updated_users,
+            "points_awarded_total": result.points_awarded_total,
+            "coupons_redeemed_total": result.coupons_redeemed_total,
+            "error_count": len(result.errors),
+        },
+    )
+
+    def _to_schema(o):
+        return ImportRowOutcome(
+            row=o.row, mobile=o.mobile, name=o.name,
+            points_awarded=o.points_awarded, coupon_redeemed=o.coupon_redeemed,
+            created=o.created, error=o.error,
+        )
+
+    return ImportExcelResponse(
+        total_rows=result.total_rows,
+        created_users=result.created_users,
+        updated_users=result.updated_users,
+        points_awarded_total=result.points_awarded_total,
+        coupons_redeemed_total=result.coupons_redeemed_total,
+        success_count=len(result.outcomes),
+        error_count=len(result.errors),
+        outcomes=[_to_schema(o) for o in result.outcomes],
+        errors=[_to_schema(o) for o in result.errors],
+        header_errors=[],
+    )
 
 
 @router.get("/{user_id}", response_model=AdminUserDetail)

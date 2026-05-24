@@ -9,8 +9,10 @@ import {
   changeUserTier,
   createAdminCustomer,
   deactivateUser,
+  downloadImportTemplate,
   fetchAdminUserDetail,
   fetchAdminUsers,
+  importCustomersExcel,
   reactivateUser,
 } from '../../api/admin';
 import {
@@ -28,22 +30,33 @@ import TicketStatusBadge from '../../components/TicketStatusBadge';
 
 export default function AdminUsers() {
   const navigate = useNavigate();
+  const { isSuperadmin } = useAdminAuth();
   const [q, setQ] = useState('');
   const debouncedQ = useDebounced(q.trim(), 250);
   const { data, loading, reload } = useAsync(() => fetchAdminUsers(debouncedQ || undefined), [debouncedQ]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const rows = data || [];
+
+  const headerActions = [
+    <button key="new" onClick={() => setCreateOpen(true)} className="savo-btn-primary text-sm">
+      + Enroll customer
+    </button>,
+  ];
+  if (isSuperadmin) {
+    headerActions.unshift(
+      <button key="imp" onClick={() => setImportOpen(true)} className="savo-btn-secondary text-sm">
+        ⬆ Import Excel
+      </button>,
+    );
+  }
 
   return (
     <div>
       <PageHeader
         title="Customers"
         subtitle="Enroll new customers, search existing ones, adjust tier or deactivate."
-        actions={[
-          <button key="new" onClick={() => setCreateOpen(true)} className="savo-btn-primary text-sm">
-            + Enroll customer
-          </button>,
-        ]}
+        actions={headerActions}
       />
 
       <div className="bg-white rounded-2xl border border-slate-200 p-3 mb-4">
@@ -90,6 +103,188 @@ export default function AdminUsers() {
         onClose={() => setCreateOpen(false)}
         onCreated={(u) => { setCreateOpen(false); reload(); navigate(`/admin/users/${u.id}`); }}
       />
+      <ImportExcelModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onDone={() => { reload(); }}
+      />
+    </div>
+  );
+}
+
+function ImportExcelModal({ open, onClose, onDone }) {
+  const { show } = useToast();
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+
+  const reset = () => { setFile(null); setResult(null); setError(''); };
+  const close = () => { reset(); onClose(); };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!file) return;
+    setBusy(true); setError(''); setResult(null);
+    try {
+      const res = await importCustomersExcel(file);
+      setResult(res);
+      if (res.header_errors?.length) {
+        setError(res.header_errors.join(' '));
+      } else {
+        show(
+          `Imported ${res.success_count} row${res.success_count === 1 ? '' : 's'} — ` +
+          `${res.created_users} new, ${res.updated_users} updated, ${res.points_awarded_total.toLocaleString('en-IN')} pts awarded`,
+          { kind: 'success' },
+        );
+        onDone();
+      }
+    } catch (err) {
+      setError(adminErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={close} title="Import customers from Excel">
+      {!result ? (
+        <form onSubmit={submit} className="space-y-4">
+          <div className="text-sm text-savo-ink/70 leading-relaxed">
+            Upload an <code className="font-mono text-xs bg-savo-purple-50 px-1 py-0.5 rounded">.xlsx</code> with
+            customer activity. Loyalty points are awarded automatically using this rule:
+          </div>
+          <div className="rounded-xl bg-savo-yellow-soft border border-amber-200 p-3 text-xs leading-relaxed">
+            <p className="font-bold text-amber-900 mb-1">Loyalty rules engine</p>
+            <ul className="list-disc pl-4 space-y-0.5 text-amber-900/90">
+              <li>Every <strong>₹10 spent = 1 point</strong> (floor division)</li>
+              <li><code className="font-mono">coupon_code</code> column marks that coupon as used on the matching customer</li>
+              <li>Unknown mobile numbers <strong>auto-create a new Bronze customer</strong> with the provided name</li>
+              <li>Tier is recomputed from the new balance — Bronze 0–999, Silver 1,000–4,999, Gold 5,000+</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+            <p className="font-bold text-slate-800 mb-1">Required columns (case-insensitive)</p>
+            <p className="font-mono text-[11px]">name, mobile, amount_spent, coupon_code, description</p>
+            <p className="text-slate-600 mt-1">
+              Only <strong>name</strong> and <strong>mobile</strong> are required. Others can be blank.
+            </p>
+            <button
+              type="button"
+              onClick={downloadImportTemplate}
+              className="mt-2 text-xs font-semibold text-savo-purple hover:underline"
+            >
+              ⬇ Download sample template
+            </button>
+          </div>
+          <Field label="Excel file" required>
+            <input
+              type="file"
+              accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="block w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-savo-purple file:text-white hover:file:bg-savo-purple-dark cursor-pointer"
+              required
+            />
+          </Field>
+          {file && (
+            <div className="text-xs text-savo-ink/70">
+              Selected: <span className="font-mono">{file.name}</span> ({(file.size / 1024).toFixed(1)} KB)
+            </div>
+          )}
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={close} className="savo-btn-secondary text-sm">Cancel</button>
+            <button type="submit" disabled={!file || busy} className="savo-btn-primary text-sm">
+              {busy ? <Spinner /> : 'Import & award points'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <ImportStat label="Total rows" value={result.total_rows} />
+            <ImportStat label="New users" value={result.created_users} accent="emerald" />
+            <ImportStat label="Updated" value={result.updated_users} accent="purple" />
+            <ImportStat label="Points awarded" value={result.points_awarded_total.toLocaleString('en-IN')} accent="yellow" />
+            <ImportStat label="Coupons used" value={result.coupons_redeemed_total} accent="purple" />
+          </div>
+
+          {result.errors?.length > 0 && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs">
+              <p className="font-bold text-red-800 mb-2">{result.errors.length} row(s) had issues</p>
+              <ul className="space-y-1 max-h-40 overflow-auto pr-1">
+                {result.errors.slice(0, 25).map((e, i) => (
+                  <li key={i} className="text-red-900/90">
+                    <span className="font-mono">row {e.row}</span>
+                    {e.mobile && <> · <span className="font-mono">{e.mobile}</span></>}
+                    {' — '}{e.error}
+                  </li>
+                ))}
+                {result.errors.length > 25 && (
+                  <li className="text-red-700 italic">…and {result.errors.length - 25} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {result.outcomes?.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs max-h-48 overflow-auto">
+              <p className="font-bold text-slate-800 mb-2">Applied rows</p>
+              <table className="w-full text-xs">
+                <thead className="text-savo-ink/55 text-[10px] uppercase tracking-wider">
+                  <tr>
+                    <th className="text-left pb-1">Row</th>
+                    <th className="text-left pb-1">Customer</th>
+                    <th className="text-right pb-1">+pts</th>
+                    <th className="text-left pb-1">Coupon</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.outcomes.slice(0, 50).map((o, i) => (
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className="py-1 font-mono">{o.row}</td>
+                      <td className="py-1">
+                        {o.name}
+                        {o.created && <span className="ml-1 text-[10px] font-bold text-emerald-700">NEW</span>}
+                        <span className="ml-1 text-savo-ink/40 font-mono">+91 {o.mobile}</span>
+                      </td>
+                      <td className="py-1 text-right tabular-nums font-bold text-emerald-700">
+                        {o.points_awarded > 0 ? `+${o.points_awarded}` : '—'}
+                      </td>
+                      <td className="py-1 font-mono text-xs">{o.coupon_redeemed || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {result.outcomes.length > 50 && (
+                <p className="text-[11px] text-savo-ink/50 italic mt-1">…and {result.outcomes.length - 50} more</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={reset} className="savo-btn-secondary text-sm">Import another</button>
+            <button type="button" onClick={close} className="savo-btn-primary text-sm">Done</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function ImportStat({ label, value, accent = 'slate' }) {
+  const ring = {
+    emerald: 'border-emerald-200 bg-emerald-50',
+    purple: 'border-savo-purple-100 bg-savo-purple-50',
+    yellow: 'border-amber-200 bg-savo-yellow-soft',
+    slate: 'border-slate-200 bg-slate-50',
+  }[accent] || 'border-slate-200 bg-slate-50';
+  return (
+    <div className={`rounded-xl border ${ring} p-2.5`}>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-savo-ink/55">{label}</p>
+      <p className="mt-0.5 text-lg font-extrabold tabular-nums">{value}</p>
     </div>
   );
 }
@@ -125,7 +320,7 @@ function CreateCustomerModal({ open, onClose, onCreated }) {
     <Modal open={open} onClose={onClose} title="Enroll new customer">
       <p className="text-xs text-savo-ink/55 mb-4">
         Since customer self-signup is disabled, every new Savomart customer is enrolled by an admin
-        here. The mobile they provide will be what they sign in with via Firebase.
+        here. The mobile they provide will be what they sign in with via OTP.
       </p>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Full name" required>

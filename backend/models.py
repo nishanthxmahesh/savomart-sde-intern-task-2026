@@ -76,6 +76,17 @@ class User(Base):
     tickets = relationship("SupportTicket", back_populates="user", cascade="all, delete-orphan")
 
 
+class OTPRecord(Base):
+    __tablename__ = "otp_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    mobile_number = Column(String(20), nullable=False, index=True)
+    otp_code = Column(String(6), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    is_used = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class PointsTransaction(Base):
     __tablename__ = "points_transactions"
 
