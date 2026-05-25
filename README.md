@@ -11,7 +11,7 @@ A customer-facing loyalty companion for Savomart shoppers — points, offers, st
 | **Author** | Nishanth Mahesh |
 | **Live frontend (Vercel)** | <https://savomart-loyalty.vercel.app/> |
 | **Live backend (Render)** | <https://savomart-api-q4vb.onrender.com> |
-| **Video demo (Google Drive)** | _To be added — see commit history for updated link_ |
+| **Video demo (Google Drive)** | <https://drive.google.com/file/d/1zZRuHJPZNsl3hWNC_lvL9ApgZx0VAgLP/view?usp=sharing> |
 | **Repository** | <https://github.com/nishanthxmahesh/savomart-sde-intern-task-2026> |
 
 > **Heads-up on the deployed demo:** Render's free tier sleeps after 15 min idle — the first request takes ~30s to wake the backend. After that it's snappy. Data persists across restarts via Neon Postgres (see [Tech & library choices](#tech--library-choices)).
@@ -318,5 +318,5 @@ savomart-sde-intern-task-2026/
 - **Author:** Nishanth Mahesh
 - **Live frontend (Vercel):** <https://savomart-loyalty.vercel.app/>
 - **Live backend (Render):** <https://savomart-api-q4vb.onrender.com>
-- **Video demo (Google Drive):** _To be added — see commit history for updated link_
+- **Video demo (Google Drive):** <https://drive.google.com/file/d/1zZRuHJPZNsl3hWNC_lvL9ApgZx0VAgLP/view?usp=sharing>
 - **Repository:** <https://github.com/nishanthxmahesh/savomart-sde-intern-task-2026>
